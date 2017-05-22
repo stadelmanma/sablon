@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 require "test_helper"
+require "support/xml_snippets"
+
 
 class HTMLConverterTest < Sablon::TestCase
+  include XMLSnippets
+
   def setup
     super
     @env = Sablon::Environment.new(nil)
@@ -358,6 +362,13 @@ DOCX
     assert_equal [Sablon::Numbering::Definition.new(1001, 'ListBullet')], @numbering.definitions
   end
 
+  def test_basic_html_table_conversion
+    input = '<table><tr><td>Cell 1</td><td>Cell 2</td></tr><tr><td>Cell 3</td><td>Cell 4</td></tr></table>'
+    expected_output = snippet('basic_table')
+    #
+    assert_equal normalize_wordml(expected_output), process(input)
+  end
+
   private
 
   def process(input)
@@ -669,6 +680,12 @@ class HTMLConverterASTTest < Sablon::TestCase
     ast = @converter.processed_ast(input)
     assert_equal [1001], get_numpr_prop_from_ast(ast, 'numId').uniq
     assert_equal [0, 1, 2, 1, 0, 1, 2], get_numpr_prop_from_ast(ast, 'ilvl')
+  end
+
+  def test_table
+    input = '<table><tr><td>Lorem</td></tr></table>'
+    ast = @converter.processed_ast(input)
+    assert_equal "<Root: [<Table{}: [<TableRow{}: [<TableCell{}: <Paragraph{}: [<Run{}: Lorem>]>>]>]>]>", ast.inspect
   end
 
   private

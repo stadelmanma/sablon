@@ -92,20 +92,21 @@ module Sablon
     end
 
     # Adds the appropriate style class to the node
-    def prepare_paragraph(node)
+    def prepare_paragraph(node, properties = {})
       # set default styles based on HTML element
       styles = { 'div' => 'Normal', 'p' => 'Paragraph', 'h' => 'Heading',
+                 'table' => nil, 'tr' => nil, 'td' => nil,
                  'ul' => 'ListBullet', 'ol' => 'ListNumber' }
       styles['li'] = @definition.style if @definition
 
       # set the node class attribute based on the style, num allows h1,h2,..
       tag, num = node.name.match(/([a-z]+)(\d*)/)[1..2]
-      unless styles[tag]
+      unless styles.key?(tag)
         raise ArgumentError, "Don't know how to handle node: #{node.inspect}"
       end
       #
-      properties = process_style(node['style'])
-      properties['pStyle'] = styles[tag] + num
+      properties = properties.merge(process_style(node['style']))
+      properties['pStyle'] = styles[tag] + num if styles[tag]
       properties
     end
 
@@ -215,12 +216,35 @@ module Sablon
         properties['numPr'] = [
           { 'ilvl' => @builder.ilvl }, { 'numId' => @definition.numid }
         ]
+      elsif node.name == 'table'
+        @builder.new_layer
+        @builder.emit Table.new(properties, ast_process_table_rows(node.children, properties))
+        return
       end
 
       # create word_ml node
       @builder.new_layer
       @builder.emit Paragraph.new(properties, ast_runs(node.children, properties))
     end
+
+    def ast_process_table_rows(nodes, properties)
+      rows = nodes.map do |node|
+        next unless node.name == 'tr' # ignore everything that isn't a row
+        local_props = prepare_paragraph(node, properties)
+        TableRow.new(properties, ast_process_table_cells(node.children, local_props))
+      end
+      Collection.new(rows.compact)
+    end
+
+    def ast_process_table_cells(nodes, properties)
+      cells = nodes.map do |node|
+        next unless node.name == 'td' # ignore everything that isn't a cell
+        local_props = prepare_paragraph(node, properties)
+        TableCell.new(properties, ast_runs(node.children, local_props))
+      end
+      Collection.new(cells.compact)
+    end
+
 
     def ast_runs(nodes, properties)
       runs = nodes.flat_map do |node|

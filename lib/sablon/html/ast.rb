@@ -105,7 +105,7 @@ module Sablon
       private
 
       def ppr_docx
-        "<w:pPr>#{process_properties}</w:pPr>"
+        "<w:pPr>#{process_properties}</w:pPr>" unless @properties.empty?
       end
     end
 
@@ -147,6 +147,100 @@ module Sablon
 
       def inspect
         "<Newline>"
+      end
+    end
+
+    class Table < Node
+      PROPERTIES = %w[jc shd tblBorders tblCaption tblCellMar tblCellSpacing
+                      tblInd tblLayout tblLook tblOverlap tblpPr tblStyle
+                      tblStyleColBandSize tblStyleRowBandSize tblW].freeze
+      attr_accessor :rows
+
+      def initialize(properties, rows)
+        @properties = filter_properties(properties)
+        @rows = rows
+      end
+
+      def to_docx
+        "<w:tbl>#{tblpr_docx}#{rows.to_docx}</w:tbl>"
+      end
+
+      def accept(visitor)
+        super
+        rows.accept(visitor)
+      end
+
+      def inspect
+        tblpr_str = @properties.map { |k, v| v ? "#{k}=#{v}" : k }.join(';')
+        "<Table{#{tblpr_str}}: #{rows.inspect}>"
+      end
+
+      private
+
+      def tblpr_docx
+        "<w:tblPr>#{process_properties}</w:tblPr>" unless @properties.empty?
+      end
+    end
+
+    class TableRow < Node
+      PROPERTIES = %w[cantSplit hidden jc tblCellSpacing tblHeader
+                      trHeight tblPrEx].freeze
+      attr_accessor :cells
+
+      def initialize(properties, cells)
+        @properties = filter_properties(properties)
+        @cells = cells
+      end
+
+      def to_docx
+        "<w:tr>#{trpr_docx}#{cells.to_docx}</w:tr>"
+      end
+
+      def accept(visitor)
+        super
+        cells.accept(visitor)
+      end
+
+      def inspect
+        trpr_str = @properties.map { |k, v| v ? "#{k}=#{v}" : k }.join(';')
+        "<TableRow{#{trpr_str}}: #{cells.inspect}>"
+      end
+
+      private
+
+      def trpr_docx
+        "<w:trPr>#{process_properties}</w:trPr>" unless @properties.empty?
+      end
+    end
+
+    class TableCell < Node
+      PROPERTIES = %w[gridSpan hideMark noWrap shd tcBorders tcFitText
+                      tcMar tcW vAlign vMerge].freeze
+      attr_accessor :paragraph
+
+      def initialize(properties, runs)
+        @properties = filter_properties(properties)
+        @paragraph = Paragraph.new(properties, runs)
+      end
+
+      def to_docx
+        "<w:tc>#{tcpr_docx}#{paragraph.to_docx}</w:tc>"
+      end
+
+      def accept(visitor)
+        super
+        paragraph.accept(visitor)
+      end
+
+      def inspect
+        tcpr_str = @properties.map { |k, v| v ? "#{k}=#{v}" : k }.join(';')
+        "<TableCell{#{tcpr_str}}: #{paragraph.inspect}>"
+      end
+
+      private
+
+      def tcpr_docx
+        "<w:tcPr>#{process_properties}</w:tcPr>" unless @properties.empty?
       end
     end
   end

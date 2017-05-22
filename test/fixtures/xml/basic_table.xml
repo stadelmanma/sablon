@@ -1,0 +1,34 @@
+<w:tbl>
+  <w:tr>
+    <w:tc>
+      <w:p>
+        <w:r>
+          <w:t xml:space="preserve">Cell 1</w:t>
+        </w:r>
+      </w:p>
+    </w:tc>
+    <w:tc>
+      <w:p>
+        <w:r>
+          <w:t xml:space="preserve">Cell 2</w:t>
+        </w:r>
+      </w:p>
+    </w:tc>
+  </w:tr>
+  <w:tr>
+    <w:tc>
+      <w:p>
+        <w:r>
+          <w:t xml:space="preserve">Cell 3</w:t>
+        </w:r>
+      </w:p>
+    </w:tc>
+    <w:tc>
+      <w:p>
+        <w:r>
+          <w:t xml:space="preserve">Cell 4</w:t>
+        </w:r>
+      </w:p>
+    </w:tc>
+  </w:tr>
+</w:tbl>
