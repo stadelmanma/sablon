@@ -115,9 +115,13 @@ module Sablon
     def prepare_run(node, properties)
       # HTML element based styles
       styles = {
-        'span' => {}, 'strong' => { 'b' => nil },
-        'b' => { 'b' => nil }, 'em' => { 'i' => nil },
-        'i' => { 'i' => nil }, 'u' => { 'u' => 'single' }
+        'span' => {},
+        'strong' => { 'b' => nil }, 'b' => { 'b' => nil },
+        'em' => { 'i' => nil }, 'i' => { 'i' => nil },
+        'u' => { 'u' => 'single' },
+        's' => { 'strike' => 'true' },
+        'sub' => { 'vertAlign' => 'subscript' },
+        'sup' => { 'vertAlign' => 'superscript' }
       }
 
       unless styles.key?(node.name)
