@@ -23,8 +23,7 @@ module Sablon
         zip_contents.keys.each do |entry_name|
           rels_file = Relationships.rels_filename(entry_name)
           if zip_contents[rels_file]
-            content = Nokogiri::XML(zip_contents[rels_file])
-            @rids[entry_name] = initial_file_rid(content)
+            @rids[entry_name] = initial_file_rid(zip_contents[rels_file])
           else
             @rids[entry_name] = 0
           end
@@ -46,13 +45,10 @@ module Sablon
       # TODO: Add logic to create a brand new rels file for an entry if needed
       def output_new_rids(zip_contents)
         @new_rels.each do |main_doc, rels|
-          # determine which rels file to open and read it
+          # determine which rels file to process
           rels_file = Relationships.rels_filename(main_doc)
-          xml_node = Nokogiri::XML(zip_contents[rels_file])
-
           # process the rels and write out new content
-          process(xml_node, rels)
-          zip_contents[rels_file] = xml_node.to_xml(indent: 0, save_with: 0)
+          zip_contents[rels_file] = process(zip_contents[rels_file], rels)
         end
       end
 

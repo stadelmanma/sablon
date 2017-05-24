@@ -10,7 +10,7 @@ module Sablon
         bmp: 'image/bmp'
       }.freeze
 
-      def self.process(doc)
+      def self.process(doc, *_args)
         TYPES.each do |extension, content_type|
           next if extensions(doc).include?(extension.to_s)
           node = Nokogiri::XML::Node.new('Default', doc)

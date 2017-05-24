@@ -2,6 +2,12 @@ module Sablon
   class Template
     def initialize(path)
       @path = path
+      # reading all entries into a hash to for quick access while processing
+      @contents = {}
+      Zip::File.open(@path).each do |entry|
+        content = entry.get_input_stream.read
+        @contents[entry.name] = Nokogiri::XML(content)
+      end
     end
 
     # Same as +render_to_string+ but writes the processed template to +output_path+.
@@ -19,48 +25,55 @@ module Sablon
     private
 
     def render(context, properties = {})
+      # initialize environment
       env = Sablon::Environment.new(self, context)
-      Zip.sort_entries = true # required to process document.xml before numbering.xml
+      env.relationships.initialize_rids(@contents)
+      # process files
+      process(%r{word/document.xml}, env, properties)
+      process(%r{word/(?:header|footer)\d*\.xml}, env)
+      process(%r{word/(?:endnotes|footnotes)\.xml}, env)
+      process(%r{word/numbering.xml}, env)
+      process(/\[Content_Types\].xml/, env)
+      #
       Zip::OutputStream.write_buffer(StringIO.new) do |out|
-        # reading all entries into a hash to prevent doc corruption
-        # https://github.com/rubyzip/rubyzip/issues/330
-        zip_contents = {}
-        Zip::File.open(@path).each do |entry|
-          zip_contents[entry.name] = entry.get_input_stream.read
-        end
-        # get initial rid of all files
-        env.relationships.initialize_rids(zip_contents)
-        # step through and process each file
-        zip_contents.each do |entry_name, content|
-          env.current_entry = entry_name
-          if entry_name == 'word/document.xml'
-            zip_contents[entry_name] = process(Processor::Document, content, env, properties)
-          elsif entry_name =~ /word\/header\d*\.xml/ || entry_name =~ /word\/footer\d*\.xml/
-            zip_contents[entry_name] = process(Processor::Document, content, env)
-          elsif entry_name == 'word/numbering.xml'
-            zip_contents[entry_name] = process(Processor::Numbering, content, env)
-          elsif entry_name == '[Content_Types].xml'
-            zip_contents[entry_name] = process(Processor::ContentType, content)
-          end
-        end
-        # update relationships
-        env.relationships.output_new_rids(zip_contents)
-        # output updated zip and add images
-        zip_contents.each do |entry_name, content|
-          out.put_next_entry(entry_name)
-          out.write(content)
-        end
-        env.images.add_images_to_zip!(out)
+        generate_output_file(out, env)
       end
     end
 
-    # process the sablon xml template with the given +context+.
-    #
     # IMPORTANT: Open Office does not ignore whitespace around tags.
     # We need to render the xml without indent and whitespace.
-    def process(processor, content, *args)
-      document = Nokogiri::XML(content)
-      processor.process(document, *args).to_xml(indent: 0, save_with: 0)
+    def generate_output_file(zip_out, env)
+      # update relationships
+      env.relationships.output_new_rids(@contents)
+      # output updated zip and add images
+      @contents.each do |entry_name, xml_node|
+        zip_out.put_next_entry(entry_name)
+        zip_out.write(xml_node.to_xml(indent: 0, save_with: 0))
+      end
+      env.images.add_images_to_zip!(zip_out)
+    end
+
+    def get_processor(entry_name)
+      if entry_name == 'word/document.xml'
+        Processor::Document
+      elsif entry_name =~ %r{word/(?:header|footer)\d*\.xml}
+        Processor::Document
+      elsif entry_name =~ %r{word/(?:endnotes|footnotes)\.xml}
+        Processor::Document
+      elsif entry_name == 'word/numbering.xml'
+        Processor::Numbering
+      elsif entry_name == '[Content_Types].xml'
+        Processor::ContentType
+      end
+    end
+
+    def process(entry_pattern, env, *args)
+      @contents.each do |entry_name, content|
+        next unless entry_pattern =~ entry_name
+        env.current_entry = entry_name
+        processor = get_processor(entry_name)
+        processor.process(content, env, *args)
+      end
     end
   end
 end
