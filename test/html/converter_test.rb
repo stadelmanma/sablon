@@ -671,9 +671,21 @@ class HTMLConverterStyleTest < Sablon::TestCase
     assert_equal normalize_wordml(expected_output), process(input)
   end
 
+  def test_table_with_text_align
+    input = '<table style="text-align: center"><tr><td>Cell 1</td></tr></table>'
+    expected_output = table_with_style(tblPr: '<w:jc w:val="center" />')
+    assert_equal normalize_wordml(expected_output), process(input)
+  end
+
   def test_table_with_width
     input = '<table style="width: 1000"><tr><td>Cell 1</td></tr></table>'
     expected_output = table_with_style(tblPr: '<w:tblW w:w="2000" w:type="dxa" />')
+    assert_equal normalize_wordml(expected_output), process(input)
+  end
+
+  def test_table_with_row_text_align
+    input = '<table><tr style="text-align: center"><td>Cell 1</td></tr></table>'
+    expected_output = table_with_style(trPr: '<w:jc w:val="center" />')
     assert_equal normalize_wordml(expected_output), process(input)
   end
 
