@@ -102,6 +102,30 @@ IMPORTANT: This feature is very much *experimental*. Currently, the insertion
     will replace the containing paragraph. This means that other content in the same
     paragraph is discarded.
 
+##### Images [experimental]
+
+For inserting images into a document, you have to follow some rules within the `.docx` template:
+
+* Create a MERGEFIELD called `@image:start`
+* Create an image placeholder
+* Create a MERGEFIELD called `@image:end`
+
+Note that the context variable name is arbitrary, we can use any name like `@profile.photo:start` and so on.
+
+
+A special naming convention must be used when defining the context so the gem knows to read the actual content at the path provided. Alternatively you can process the image imediately using `Sablon.content`
+```
+{
+  'image:my_image' => '/path/to/image.jpg',
+  my_image2: Sablon.content(:image, '/path/to/image.jpg')
+}
+
+template.render_to_file()output_path, context)
+```
+For a complete example see the test file located on `test/image_test.rb`.
+
+This functionality was inspired in the [kubido fork](https://github.com/kubido/sablon) for this project - kubido/sablon
+
 ##### HTML
 
 Similar to WordProcessingML it's possible to use html as input while processing the template. You don't need to modify your templates, a simple insertion operation
@@ -137,7 +161,7 @@ Basic conversion of CSS inline styles into matching WordML properties in support
   * http://officeopenxml.com/WPparagraphProperties.php
   * http://officeopenxml.com/WPtextFormatting.php
 
-If you wish to write out your HTML code in an indented human readable fashion, or you are pulling content from the ERB templating engine in rails the following regular expression can help eliminate extraneous whitespace in the final document. 
+If you wish to write out your HTML code in an indented human readable fashion, or you are pulling content from the ERB templating engine in rails the following regular expression can help eliminate extraneous whitespace in the final document.
 ```ruby
 # combine all white space
 html_str = html_str.gsub(/\s+/, ' ')
