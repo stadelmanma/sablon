@@ -2,23 +2,106 @@ module Sablon
   class HTMLConverter
     class Node
       PROPERTIES = [].freeze
-      def accept(visitor)
-        visitor.visit(self)
+      FORCE_TRANSFER = [].freeze
+      # styles shared or common logic across all node types go here. Any
+      # undefined styles are passed straight through "as is" to the
+      # properties hash. Keys that are symbols will not get called directly
+      # when processing the style string and are suitable for internal-only
+      # usage across different classes.
+      STYLE_CONVERSION = {
+        'background-color' => lambda { |v|
+          return 'shd', { val: 'clear', fill: v.delete('#') }
+        },
+        border: lambda { |v|
+          props = { sz: 2, val: 'single', color: '000000' }
+          vals = v.split
+          vals[1] = 'single' if vals[1] == 'solid'
+          #
+          props[:sz] = (2 * Float(vals[0].gsub(/[^\d.]/, '')).ceil).to_s if vals[0]
+          props[:val] = vals[1] if vals[1]
+          props[:color] = vals[2].delete('#') if vals[2]
+          #
+          return props
+        }
+      }
+      STYLE_CONVERSION.default_proc = proc do |hash, key|
+        ->(v) { return key, v }
       end
+      STYLE_CONVERSION.freeze
+      attr_accessor :children
 
       def self.node_name
         @node_name ||= name.split('::').last
       end
 
+      # maps the CSS style property to it's OpenXML equivalent. Not all CSS
+      # properties have an equivalent, nor share the same behavior when
+      # defined on different node types (Paragraph, Table and Run).
+      def self.process_style(style_str)
+        return {} unless style_str
+        #
+        styles = style_str.split(';').map { |pair| pair.split(':') }
+        # process the styles as a hash and store values
+        style_attrs = {}
+        Hash[styles].each do |key, value|
+          key, value = convert_style_attr(key.strip, value.strip)
+          style_attrs[key] = value if key
+        end
+        style_attrs
+      end
+
+      # handles conversion of a single attribute allowing recursion through
+      # super classes until the node class is reached
+      def self.convert_style_attr(key, value)
+        if self::STYLE_CONVERSION[key]
+          self::STYLE_CONVERSION[key].call(value)
+        else
+          superclass.convert_style_attr(key, value)
+        end
+      end
+
+      # creates a hash of all properties that aren't consumed by the node
+      # to be passed onto child nodes
+      def self.transferred_properties(properties)
+        props = properties.map do |key, value|
+          next [key, value] if self::FORCE_TRANSFER.include? key
+          next if self::PROPERTIES.include? key
+          [key, value]
+        end
+        # filter out nils and return hash
+        Hash[props.compact]
+      end
+
+      def initialize(properties, children)
+        @properties = filter_properties(properties)
+        @children = children
+      end
+
+      def accept(visitor)
+        visitor.visit(self)
+        children.accept(visitor) if children
+      end
+
+      def to_docx
+        tag = self.class::WORD_ML_TAG
+        "<#{tag}>#{properties_to_docx}#{children.to_docx}</#{tag}>"
+      end
+
+      def inspect
+        pr_str = @properties.map { |k, v| v ? "#{k}=#{v}" : k }.join(';')
+        "<#{self.class.node_name}{#{pr_str}}: #{children.inspect}>"
+      end
+
       private
 
+      # removes properties that are not whitelisted by the class
       def filter_properties(properties)
         props = properties.map do |key, value|
           next unless self.class::PROPERTIES.include? key
           [key, value]
         end
         # filter out nils and return hash
-        Hash[props.reject { |pair| pair.nil? }]
+        Hash[props.compact]
       end
 
       # processes attributes defined on the node into wordML property syntax
@@ -42,6 +125,11 @@ module Sablon
           value = format('w:val="%s" ', value) if value
           "<w:#{key} #{value}/>"
         end
+      end
+
+      def properties_to_docx
+        tag = self.class::WORD_ML_TAG + 'Pr'
+        "<#{tag}>#{process_properties}</#{tag}>" unless @properties.empty?
       end
     end
 
@@ -83,64 +171,72 @@ module Sablon
       PROPERTIES = %w[framePr ind jc keepLines keepNext numPr
                       outlineLvl pBdr pStyle rPr sectPr shd spacing
                       tabs textAlignment].freeze
-      attr_accessor :runs
-      def initialize(properties, runs)
-        @properties = filter_properties(properties)
-        @runs = runs
-      end
-
-      def to_docx
-        "<w:p>#{ppr_docx}#{runs.to_docx}</w:p>"
-      end
-
-      def accept(visitor)
-        super
-        runs.accept(visitor)
-      end
-
-      def inspect
-        "<Paragraph{#{@properties['pStyle']}}: #{runs.inspect}>"
-      end
-
-      private
-
-      def ppr_docx
-        "<w:pPr>#{process_properties}</w:pPr>" unless @properties.empty?
-      end
+      WORD_ML_TAG = 'w:p'.freeze
+      STYLE_CONVERSION = {
+        'border' => lambda { |v|
+          props = Node::STYLE_CONVERSION[:border].call(v)
+          #
+          return 'pBdr', [
+            { top: props }, { bottom: props },
+            { left: props }, { right: props }
+          ]
+        },
+        'text-align' => ->(v) { return 'jc', v },
+        'vertical-align' => ->(v) { return 'textAlignment', v }
+      }.freeze
     end
 
     class Run < Node
       PROPERTIES = %w[b i caps color dstrike emboss imprint highlight outline
                       rStyle shadow shd smallCaps strike sz u vanish
                       vertAlign].freeze
-      attr_reader :string
-      def initialize(string, properties)
-        @properties = filter_properties(properties)
-        @string = string
+      WORD_ML_TAG = 'w:r'.freeze
+      STYLE_CONVERSION = {
+        'color' => ->(v) { return 'color', v.delete('#') },
+        'font-size' => lambda { |v|
+          return 'sz', (2 * Float(v.gsub(/[^\d.]/, '')).ceil).to_s
+        },
+        'font-style' => lambda { |v|
+          return 'b', nil if v =~ /bold/
+          return 'i', nil if v =~ /italic/
+        },
+        'font-weight' => ->(v) { return 'b', nil if v =~ /bold/ },
+        'text-decoration' => lambda { |v|
+          supported = %w[line-through underline]
+          props = v.split
+          return props[0], 'true' unless supported.include? props[0]
+          return 'strike', 'true' if props[0] == 'line-through'
+          return 'u', 'single' if props.length == 1
+          return 'u', { val: props[1], color: 'auto' } if props.length == 2
+          return 'u', { val: props[1], color: props[2].delete('#') }
+        },
+        'vertical-align' => lambda { |v|
+          return 'vertAlign', 'subscript' if v =~ /sub/
+          return 'vertAlign', 'superscript' if v =~ /super/
+        }
+      }.freeze
+
+      Text = Struct.new(:string) do
+        def accept(*_); end
+
+        def inspect
+          string
+        end
+
+        def to_docx
+          content = string.tr("\u00A0", ' ')
+          "<w:t xml:space=\"preserve\">#{content}</w:t>"
+        end
       end
 
-      def to_docx
-        "<w:r>#{rpr_docx}#{text}</w:r>"
-      end
-
-      def inspect
-        rpr_str = @properties.map { |k, v| v ? "#{k}=#{v}" : k }.join(';')
-        "<Run{#{rpr_str}}: #{string}>"
-      end
-
-      private
-
-      def rpr_docx
-        "<w:rPr>#{process_properties}</w:rPr>" unless @properties.empty?
-      end
-
-      def text
-        content = @string.tr("\u00A0", ' ')
-        "<w:t xml:space=\"preserve\">#{content}</w:t>"
+      def initialize(properties, string)
+        super properties, Text.new(string)
       end
     end
 
     class Newline < Node
+      def initialize; end
+
       def to_docx
         "<w:r><w:br/></w:r>"
       end
@@ -154,94 +250,77 @@ module Sablon
       PROPERTIES = %w[jc shd tblBorders tblCaption tblCellMar tblCellSpacing
                       tblInd tblLayout tblLook tblOverlap tblpPr tblStyle
                       tblStyleColBandSize tblStyleRowBandSize tblW].freeze
-      attr_accessor :rows
-
-      def initialize(properties, rows)
-        @properties = filter_properties(properties)
-        @rows = rows
-      end
-
-      def to_docx
-        "<w:tbl>#{tblpr_docx}#{rows.to_docx}</w:tbl>"
-      end
-
-      def accept(visitor)
-        super
-        rows.accept(visitor)
-      end
-
-      def inspect
-        tblpr_str = @properties.map { |k, v| v ? "#{k}=#{v}" : k }.join(';')
-        "<Table{#{tblpr_str}}: #{rows.inspect}>"
-      end
-
-      private
-
-      def tblpr_docx
-        "<w:tblPr>#{process_properties}</w:tblPr>" unless @properties.empty?
-      end
+      FORCE_TRANSFER = %[shd].freeze
+      WORD_ML_TAG = 'w:tbl'.freeze
+      STYLE_CONVERSION = {
+        'border' => lambda { |v|
+          props = Node::STYLE_CONVERSION[:border].call(v)
+          #
+          return 'tblBorders', [
+            { top: props }, { start: props }, { bottom: props },
+            { end: props }, { insideH: props }, { insideV: props }
+          ]
+        },
+        'margin' => lambda { |v|
+          vals = v.split.map { |s| (2 * Float(s.gsub(/[^\d.]/, '')).ceil).to_s }
+          #
+          props = [vals[0], vals[0], vals[0], vals[0]] if vals.length == 1
+          props = [vals[0], vals[1], vals[0], vals[1]] if vals.length == 2
+          props = [vals[0], vals[1], vals[2], vals[1]] if vals.length == 3
+          props = [vals[0], vals[1], vals[2], vals[3]] if vals.length > 3
+          return 'tblCellMar', [
+            { top: { w: props[0], type: 'dxa' } },
+            { end: { w: props[1], type: 'dxa' } },
+            { bottom: { w: props[2], type: 'dxa' } },
+            { start: { w: props[3], type: 'dxa' } }
+          ]
+        },
+        'cellspacing' => lambda { |v|
+          v = (2 * Float(v.gsub(/[^\d.]/, '')).ceil).to_s
+          return 'tblCellSpacing', { w: v, type: 'dxa' }
+        },
+        'width' => lambda { |v|
+          v = (2 * Float(v.gsub(/[^\d.]/, '')).ceil).to_s
+          return 'tblW', { w: v, type: 'dxa' }
+        }
+      }.freeze
     end
 
     class TableRow < Node
       PROPERTIES = %w[cantSplit hidden jc tblCellSpacing tblHeader
                       trHeight tblPrEx].freeze
-      attr_accessor :cells
-
-      def initialize(properties, cells)
-        @properties = filter_properties(properties)
-        @cells = cells
-      end
-
-      def to_docx
-        "<w:tr>#{trpr_docx}#{cells.to_docx}</w:tr>"
-      end
-
-      def accept(visitor)
-        super
-        cells.accept(visitor)
-      end
-
-      def inspect
-        trpr_str = @properties.map { |k, v| v ? "#{k}=#{v}" : k }.join(';')
-        "<TableRow{#{trpr_str}}: #{cells.inspect}>"
-      end
-
-      private
-
-      def trpr_docx
-        "<w:trPr>#{process_properties}</w:trPr>" unless @properties.empty?
-      end
+      WORD_ML_TAG = 'w:tr'.freeze
     end
 
     class TableCell < Node
       PROPERTIES = %w[gridSpan hideMark noWrap shd tcBorders tcFitText
                       tcMar tcW vAlign vMerge].freeze
-      attr_accessor :paragraph
-
-      def initialize(properties, runs)
-        @properties = filter_properties(properties)
-        @paragraph = Paragraph.new(properties, runs)
-      end
-
-      def to_docx
-        "<w:tc>#{tcpr_docx}#{paragraph.to_docx}</w:tc>"
-      end
-
-      def accept(visitor)
-        super
-        paragraph.accept(visitor)
-      end
-
-      def inspect
-        tcpr_str = @properties.map { |k, v| v ? "#{k}=#{v}" : k }.join(';')
-        "<TableCell{#{tcpr_str}}: #{paragraph.inspect}>"
-      end
-
-      private
-
-      def tcpr_docx
-        "<w:tcPr>#{process_properties}</w:tcPr>" unless @properties.empty?
-      end
+      WORD_ML_TAG = 'w:tc'.freeze
+      STYLE_CONVERSION = {
+        'border' => lambda { |v|
+          value = Table::STYLE_CONVERSION['border'].call(v)[1]
+          return 'tcBorders', value
+        },
+        'colspan' => ->(v) { return 'gridSpan', v },
+        'margin' => lambda { |v|
+          value = Table::STYLE_CONVERSION['margin'].call(v)[1]
+          return 'tcMar', value
+        },
+        'rowspan' => lambda { |v|
+          return 'vMerge', 'restart' if v == 'start'
+          return 'vMerge', v if v == 'continue'
+          return 'vMerge', nil if v == 'end'
+        },
+        'vertical-align' => ->(v) { return 'vAlign', v },
+        'white-space' => lambda { |v|
+          return 'noWrap', nil if v == 'nowrap'
+          return 'tcFitText', 'true' if v == 'fit'
+        },
+        'width' => lambda { |v|
+          value = Table::STYLE_CONVERSION['width'].call(v)[1]
+          return 'tcW', value
+        },
+      }.freeze
     end
   end
 end

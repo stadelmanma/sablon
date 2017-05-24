@@ -93,21 +93,25 @@ module Sablon
 
     # Adds the appropriate style class to the node
     def prepare_paragraph(node, properties = {})
-      # set default styles based on HTML element
-      styles = { 'div' => 'Normal', 'p' => 'Paragraph', 'h' => 'Heading',
-                 'table' => nil, 'tr' => nil, 'td' => nil,
-                 'ul' => 'ListBullet', 'ol' => 'ListNumber' }
+      # determine conversion class for table separately.
+      node_cls = { 'table' => Table, 'tr' => TableRow, 'td' => TableCell }
+      node_cls.default = Paragraph
+      # set default styles based on HTML element allowing for h1, h2, etc.
+      styles = Hash.new do |hash, key|
+        tag, num = key.match(/([a-z]+)(\d*)/)[1..2]
+        { 'pStyle' => hash[tag]['pStyle'] + num } if hash[tag]
+      end
+      styles.merge!('div' => 'Normal', 'p' => 'Paragraph', 'h' => 'Heading',
+                    'table' => nil, 'tr' => nil, 'td' => nil,
+                    'ul' => 'ListBullet', 'ol' => 'ListNumber')
       styles['li'] = @definition.style if @definition
-
-      # set the node class attribute based on the style, num allows h1,h2,..
-      tag, num = node.name.match(/([a-z]+)(\d*)/)[1..2]
-      unless styles.key?(tag)
+      styles.each { |k, v| styles[k] = v ? { 'pStyle' => v } : {} }
+      #
+      unless styles[node.name] || styles.key?(node.name)
         raise ArgumentError, "Don't know how to handle node: #{node.inspect}"
       end
       #
-      properties = properties.merge(process_style(node['style']))
-      properties['pStyle'] = styles[tag] + num if styles[tag]
-      properties
+      merge_properties(node, properties, styles[node.name], node_cls[node.name])
     end
 
     # Adds properties to the run, from the parent, the style node attributes
@@ -116,7 +120,7 @@ module Sablon
     def prepare_run(node, properties)
       # HTML element based styles
       styles = {
-        'span' => {},
+        'span' => {}, 'br' => {}, 'text' => {},
         'strong' => { 'b' => nil }, 'b' => { 'b' => nil },
         'em' => { 'i' => nil }, 'i' => { 'i' => nil },
         'u' => { 'u' => 'single' },
@@ -128,62 +132,21 @@ module Sablon
       unless styles.key?(node.name)
         raise ArgumentError, "Don't know how to handle node: #{node.inspect}"
       end
-      # Process any styles, return the new hash to avoid mutation of original
-      properties = properties.merge(process_style(node['style']))
-
-      # Set the element specific attributes, overriding any other values
-      properties.merge(styles[node.name])
+      merge_properties(node, properties, styles[node.name], Run)
     end
 
-    # maps the CSS style property to it's OpenXML equivalent. Not all CSS
-    # properties have an equivalent, nor are valid for both a Paragraph and Run.
-    # TODO: When processing a paragraph return the styles that need passed onto
-    # runs within with the added complexity of above it may make more sense to
-    # move this over to the Node class
-    def process_style(style_str)
-      #
-      return {} unless style_str
-      # styles without an entry are passed "as is" to the node attributes
-      attr_map = {
-        'background-color' => lambda { |v|
-          return 'shd', { val: 'clear', fill: v.delete('#') }
-        },
-        'color' => ->(v) { return 'color', v.delete('#') },
-        'font-size' => lambda { |v|
-          return 'sz', (2 * Float(v.gsub(/[^\d.]/, '')).ceil).to_s
-        },
-        'font-style' => lambda { |v|
-          return 'b', nil if v =~ /bold/
-          return 'i', nil if v =~ /italic/
-        },
-        'font-weight' => ->(v) { return 'b', nil if v =~ /bold/ },
-        'text-align' => ->(v) { return 'jc', v },
-        'text-decoration' => lambda { |v|
-          supported = %w[line-through underline]
-          props = v.split
-          return props[0], 'true' unless supported.include? props[0]
-          return 'strike', 'true' if props[0] == 'line-through'
-          return 'u', 'single' if props.length == 1
-          return 'u', { val: props[1], color: 'auto' } if props.length == 2
-          return 'u', { val: props[1], color: props[2].delete('#') }
-        },
-        'vertical-align' => lambda { |v|
-          return 'vertAlign', 'subscript' if v =~ /sub/
-          return 'vertAlign', 'superscript' if v =~ /super/
-        }
-      }
-      #
-      styles = style_str.split(';').map { |pair| pair.split(':') }
-
-      # process the styles as a hash and store values
-      style_attrs = {}
-      Hash[styles].each do |key, value|
-        key = key.strip
-        value = value.strip
-        key, value = attr_map[key].call(value) if attr_map[key]
-        style_attrs[key] = value if key
+    def merge_properties(node, par_props, elm_props, ast_class)
+      # perform an initial conversion for any leftover CSS props passed in
+      properties = par_props.map do |k, v|
+        ast_class.convert_style_attr(k, v)
       end
-      style_attrs
+      properties = Hash[properties]
+
+      # Process any styles, defined on the node
+      properties.merge!(ast_class.process_style(node['style']))
+
+      # Set the element specific attributes, overriding any other values
+      properties.merge(elm_props)
     end
 
     # handles passing all attributes on the parent down to children
@@ -218,20 +181,23 @@ module Sablon
         ]
       elsif node.name == 'table'
         @builder.new_layer
-        @builder.emit Table.new(properties, ast_process_table_rows(node.children, properties))
+        trans_props = Table.transferred_properties(properties)
+        @builder.emit Table.new(properties, ast_process_table_rows(node.children, trans_props))
         return
       end
 
       # create word_ml node
       @builder.new_layer
-      @builder.emit Paragraph.new(properties, ast_runs(node.children, properties))
+      trans_props = Paragraph.transferred_properties(properties)
+      @builder.emit Paragraph.new(properties, ast_runs(node.children, trans_props))
     end
 
     def ast_process_table_rows(nodes, properties)
       rows = nodes.map do |node|
         next unless node.name == 'tr' # ignore everything that isn't a row
         local_props = prepare_paragraph(node, properties)
-        TableRow.new(properties, ast_process_table_cells(node.children, local_props))
+        trans_props = TableRow.transferred_properties(local_props)
+        TableRow.new(local_props, ast_process_table_cells(node.children, trans_props))
       end
       Collection.new(rows.compact)
     end
@@ -240,28 +206,31 @@ module Sablon
       cells = nodes.map do |node|
         next unless node.name == 'td' # ignore everything that isn't a cell
         local_props = prepare_paragraph(node, properties)
-        TableCell.new(properties, ast_runs(node.children, local_props))
+        para_props = TableCell.transferred_properties(local_props)
+        run_props = Paragraph.transferred_properties(para_props)
+        paragraph = Paragraph.new(para_props, ast_runs(node.children, run_props))
+        TableCell.new(local_props, paragraph)
       end
       Collection.new(cells.compact)
     end
 
-
     def ast_runs(nodes, properties)
       runs = nodes.flat_map do |node|
+        begin
+          local_props = prepare_run(node, properties)
+        rescue ArgumentError
+          raise unless %w[ul ol p div].include?(node.name)
+          merge_node_attributes(node, node.parent.attributes)
+          @builder.push(node)
+          next nil
+        end
+        #
         if node.text?
-          Run.new(node.text, properties)
+          Run.new(local_props, node.text)
         elsif node.name == 'br'
           Newline.new
         else
-          begin
-            local_props = prepare_run(node, properties)
-            ast_runs(node.children, local_props).nodes
-          rescue ArgumentError
-            raise unless %w[ul ol p div].include?(node.name)
-            merge_node_attributes(node, node.parent.attributes)
-            @builder.push(node)
-            nil
-          end
+          ast_runs(node.children, local_props).nodes
         end
       end
       Collection.new(runs.compact)
