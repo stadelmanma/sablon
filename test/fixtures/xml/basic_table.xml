@@ -2,6 +2,35 @@
   <w:tr>
     <w:tc>
       <w:p>
+        <w:pPr>
+          <w:jc w:val="center" />
+        </w:pPr>
+        <w:r>
+          <w:rPr>
+            <w:b />
+          </w:rPr>
+          <w:t xml:space="preserve">TH 1</w:t>
+        </w:r>
+      </w:p>
+    </w:tc>
+    <w:tc>
+      <w:p>
+        <w:pPr>
+          <w:jc w:val="center" />
+        </w:pPr>
+        <w:r>
+          <w:rPr>
+            <w:b />
+          </w:rPr>
+          <w:t xml:space="preserve">TH 2</w:t>
+        </w:r>
+      </w:p>
+    </w:tc>
+  </w:tr>
+
+  <w:tr>
+    <w:tc>
+      <w:p>
         <w:r>
           <w:t xml:space="preserve">Cell 1</w:t>
         </w:r>

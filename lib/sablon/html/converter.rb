@@ -94,7 +94,8 @@ module Sablon
     # Adds the appropriate style class to the node
     def prepare_paragraph(node, properties = {})
       # determine conversion class for table separately.
-      node_cls = { 'table' => Table, 'tr' => TableRow, 'td' => TableCell }
+      node_cls = { 'table' => Table, 'tr' => TableRow, 'td' => TableCell,
+                   'th' => TableCell }
       node_cls.default = Paragraph
       # set default styles based on HTML element allowing for h1, h2, etc.
       styles = Hash.new do |hash, key|
@@ -106,6 +107,7 @@ module Sablon
                     'ul' => 'ListBullet', 'ol' => 'ListNumber')
       styles['li'] = @definition.style if @definition
       styles.each { |k, v| styles[k] = v ? { 'pStyle' => v } : {} }
+      styles['th'] = { 'b' => nil, 'jc' => 'center' }
       #
       unless styles[node.name] || styles.key?(node.name)
         raise ArgumentError, "Don't know how to handle node: #{node.inspect}"
@@ -204,7 +206,8 @@ module Sablon
 
     def ast_process_table_cells(nodes, properties)
       cells = nodes.map do |node|
-        next unless node.name == 'td' # ignore everything that isn't a cell
+        # ignore everything that isn't a cell
+        next unless node.name == 'td' || node.name == 'th'
         local_props = prepare_paragraph(node, properties)
         para_props = TableCell.transferred_properties(local_props)
         run_props = Paragraph.transferred_properties(para_props)

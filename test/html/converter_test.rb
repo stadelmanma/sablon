@@ -363,7 +363,13 @@ class HTMLConverterTest < Sablon::TestCase
   end
 
   def test_basic_html_table_conversion
-    input = '<table><tr><td>Cell 1</td><td>Cell 2</td></tr><tr><td>Cell 3</td><td>Cell 4</td></tr></table>'
+    input = <<-HTML
+      <table>
+        <tr><th>TH 1</th><th>TH 2</th></tr>
+        <tr><td>Cell 1</td><td>Cell 2</td></tr>
+        <tr><td>Cell 3</td><td>Cell 4</td></tr>
+      </table>
+    HTML
     expected_output = snippet('basic_table')
     #
     assert_equal normalize_wordml(expected_output), process(input)
