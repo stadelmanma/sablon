@@ -22,7 +22,8 @@ module Sablon
           props[:color] = vals[2].delete('#') if vals[2]
           #
           return props
-        }
+        },
+        'text-align' => ->(v) { return 'jc', v }
       }
       STYLE_CONVERSION.default_proc = proc do |hash, key|
         ->(v) { return key, v }
@@ -181,7 +182,6 @@ module Sablon
             { left: props }, { right: props }
           ]
         },
-        'text-align' => ->(v) { return 'jc', v },
         'vertical-align' => ->(v) { return 'textAlignment', v }
       }.freeze
     end
