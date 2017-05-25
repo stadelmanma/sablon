@@ -10,6 +10,8 @@ class HTMLConverterTest < Sablon::TestCase
     super
     @env = Sablon::Environment.new(nil)
     @numbering = @env.numbering
+    @footnotes = @env.footnotes
+    @footnotes.instance_variable_set(:@counter, 1)
     @converter = Sablon::HTMLConverter.new
   end
 
@@ -371,6 +373,75 @@ class HTMLConverterTest < Sablon::TestCase
       </table>
     HTML
     expected_output = snippet('basic_table')
+    #
+    assert_equal normalize_wordml(expected_output), process(input)
+  end
+
+  def test_footnoteref_conversion
+    input = '<p>Lorem<footnoteref id="1"></p>'
+    expected_output = <<-DOCX.strip
+      <w:p>
+        <w:pPr>
+          <w:pStyle w:val="Paragraph" />
+        </w:pPr>
+        <w:r>
+          <w:t xml:space="preserve">Lorem</w:t>
+        </w:r>
+        <w:r>
+          <w:rPr>
+            <w:rStyle w:val="FootnoteReference" />
+          </w:rPr>
+          <w:footnoteReference w:id="1"/>
+        </w:r>
+      </w:p>
+    DOCX
+    #
+    assert_equal normalize_wordml(expected_output), process(input)
+  end
+
+  def test_footnote_conversion
+    input = '<footnote placeholder="test">Lorem Ipsum</footnote>'
+    expected_output = <<-DOCX.strip
+      <w:footnote w:id="2">
+        <w:p>
+          <w:pPr><
+            w:pStyle w:val="FootnoteText" />
+          </w:pPr>
+          <w:r>
+            <w:rPr>
+              <w:rStyle w:val="FootnoteReference"/>
+            </w:rPr>
+            <w:footnoteRef/>
+          </w:r>
+          <w:r>
+            <w:t xml:space="preserve">Lorem Ipsum</w:t>
+          </w:r>
+        </w:p>
+      </w:footnote>
+    DOCX
+    #
+    assert_equal '', process(input)
+    assert_equal normalize_wordml(expected_output), @footnotes.new_footnotes[0].to_docx
+  end
+
+  def test_footnote_and_ref_conversion
+    input = '<p>Lorem<footnoteref placeholder="test"></p><footnote placeholder="test">Lorem Ipsum</footnote>'
+    expected_output = <<-DOCX.strip
+      <w:p>
+        <w:pPr>
+          <w:pStyle w:val="Paragraph" />
+        </w:pPr>
+        <w:r>
+          <w:t xml:space="preserve">Lorem</w:t>
+        </w:r>
+        <w:r>
+          <w:rPr>
+            <w:rStyle w:val="FootnoteReference" />
+          </w:rPr>
+          <w:footnoteReference w:id="2"/>
+        </w:r>
+      </w:p>
+    DOCX
     #
     assert_equal normalize_wordml(expected_output), process(input)
   end
@@ -842,8 +913,11 @@ end
 class HTMLConverterASTTest < Sablon::TestCase
   def setup
     super
+    @footnotes = Sablon::Environment.new(nil).footnotes
+    @footnotes.instance_variable_set(:@counter, 1)
     @converter = Sablon::HTMLConverter.new
     @converter.instance_variable_set(:@numbering, Sablon::Environment.new(nil).numbering)
+    @converter.instance_variable_set(:@footnotes, @footnotes)
   end
 
   def test_div
@@ -945,6 +1019,22 @@ class HTMLConverterASTTest < Sablon::TestCase
     input = '<table><tr><td>Lorem</td></tr></table>'
     ast = @converter.processed_ast(input)
     assert_equal "<Root: [<Table{}: [<TableRow{}: [<TableCell{}: <Paragraph{}: [<Run{}: Lorem>]>>]>]>]>", ast.inspect
+  end
+
+  def test_footnoteref
+    input = '<p>Lorem<footnoteref id="2"/></p>'
+    ast = @converter.processed_ast(input)
+    assert_equal "<Root: [<Paragraph{pStyle=Paragraph}: [<Run{}: Lorem>, <FootnoteReference{rStyle=FootnoteReference}: id=2>]>]>", ast.inspect
+  end
+
+  def test_footnote
+    input = '<footnote placeholder="test">Lorem Ipsum</footnote>'
+    ast = @converter.processed_ast(input)
+    #
+    assert_equal 1, @footnotes.new_footnotes.length
+    assert_equal "2", @footnotes.new_footnotes[0].ref_id
+    assert_equal "<Footnote{}: <Paragraph{pStyle=FootnoteText}: [<footnoteRef>, <Run{}: Lorem Ipsum>]>>", @footnotes.new_footnotes[0].inspect
+    assert_equal "<Root: []>", ast.inspect
   end
 
   private

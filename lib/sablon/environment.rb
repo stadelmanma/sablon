@@ -6,6 +6,7 @@ module Sablon
     attr_reader :images
     attr_reader :numbering
     attr_reader :relationships
+    attr_reader :footnotes
     attr_reader :context
 
     attr_reader :current_entry
@@ -15,6 +16,10 @@ module Sablon
     def register_relationship(type_uri, target)
       attr_hash = { 'Id' => nil, 'Type' => type_uri, 'Target' => target }
       @relationships.register_relationship(@current_entry, attr_hash)
+    end
+
+    def register_footnote(footnote)
+      @footnotes.new_footnotes << footnote
     end
 
     # returns a new environment with merged contexts
@@ -34,12 +39,14 @@ module Sablon
         @images = parent_env.images
         @numbering = parent_env.numbering
         @relationships = parent_env.relationships
+        @footnotes = parent_env.footnotes
       else
         @current_entry = nil
         @template = template
         @images = Images.new
         @numbering = Numbering.new
         @relationships = Sablon::Processor::Relationships.new
+        @footnotes = Sablon::Processor::Footnotes.new
       end
       #
       @context = Context.transform_hash(context)

@@ -66,7 +66,11 @@ module Sablon
 
     def process(input, env)
       @numbering = env.numbering
-      processed_ast(input).to_docx
+      @footnotes = env.footnotes
+      ast = processed_ast(input)
+      # update references before hard conversion into docx string
+      @footnotes.update_refereces
+      ast.to_docx
     end
 
     def processed_ast(input)
@@ -89,13 +93,14 @@ module Sablon
 
     def initialize
       @numbering = nil
+      @new_footnotes = nil
     end
 
     # Adds the appropriate style class to the node
     def prepare_paragraph(node, properties = {})
       # determine conversion class for table separately.
       node_cls = { 'table' => Table, 'tr' => TableRow, 'td' => TableCell,
-                   'th' => TableCell }
+                   'th' => TableCell, 'footnote' => Footnote }
       node_cls.default = Paragraph
       # set default styles based on HTML element allowing for h1, h2, etc.
       styles = Hash.new do |hash, key|
@@ -104,6 +109,7 @@ module Sablon
       end
       styles.merge!('div' => 'Normal', 'p' => 'Paragraph', 'h' => 'Heading',
                     'table' => nil, 'tr' => nil, 'td' => nil,
+                    'footnote' => 'FootnoteText',
                     'ul' => 'ListBullet', 'ol' => 'ListNumber')
       styles['li'] = @definition.style if @definition
       styles.each { |k, v| styles[k] = v ? { 'pStyle' => v } : {} }
@@ -128,7 +134,8 @@ module Sablon
         'u' => { 'u' => 'single' },
         's' => { 'strike' => 'true' },
         'sub' => { 'vertAlign' => 'subscript' },
-        'sup' => { 'vertAlign' => 'superscript' }
+        'sup' => { 'vertAlign' => 'superscript' },
+        'footnoteref' => { 'rStyle' => 'FootnoteReference' }
       }
 
       unless styles.key?(node.name)
@@ -181,6 +188,11 @@ module Sablon
         properties['numPr'] = [
           { 'ilvl' => @builder.ilvl }, { 'numId' => @definition.numid }
         ]
+      elsif node.name == 'footnote'
+        properties = prepare_paragraph(node)
+        trans_props = Footnote.transferred_properties(properties)
+        @footnotes << Footnote.new(properties, node['placeholder'], ast_runs(node.children, trans_props))
+        return
       elsif node.name == 'table'
         @builder.new_layer
         trans_props = Table.transferred_properties(properties)
@@ -232,6 +244,10 @@ module Sablon
           Run.new(local_props, node.text)
         elsif node.name == 'br'
           Newline.new
+        elsif node.name == 'footnoteref'
+          ref = FootnoteReference.new(local_props, node)
+          @footnotes.new_references << ref unless node['id']
+          ref
         else
           ast_runs(node.children, local_props).nodes
         end

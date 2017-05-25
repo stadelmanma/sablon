@@ -6,7 +6,11 @@ module Sablon
       @contents = {}
       Zip::File.open(@path).each do |entry|
         content = entry.get_input_stream.read
-        @contents[entry.name] = Nokogiri::XML(content)
+        @contents[entry.name] = if entry.name =~ /\.(?:xml|rels)$/
+                                  Nokogiri::XML(content)
+                                else
+                                  content
+                                end
       end
     end
 
@@ -28,10 +32,12 @@ module Sablon
       # initialize environment
       env = Sablon::Environment.new(self, context)
       env.relationships.initialize_rids(@contents)
+      env.footnotes.initialize_footnotes(@contents['word/footnotes.xml'])
       # process files
       process(%r{word/document.xml}, env, properties)
       process(%r{word/(?:header|footer)\d*\.xml}, env)
-      process(%r{word/(?:endnotes|footnotes)\.xml}, env)
+      process(%r{word/footnotes\.xml}, env)
+      process(%r{word/endnotes\.xml}, env)
       process(%r{word/numbering.xml}, env)
       process(/\[Content_Types\].xml/, env)
       #
@@ -48,7 +54,11 @@ module Sablon
       # output updated zip and add images
       @contents.each do |entry_name, xml_node|
         zip_out.put_next_entry(entry_name)
-        zip_out.write(xml_node.to_xml(indent: 0, save_with: 0))
+        if entry_name =~ /\.(?:xml|rels)$/
+          zip_out.write(xml_node.to_xml(indent: 0, save_with: 0))
+        else
+          zip_out.write(xml_node)
+        end
       end
       env.images.add_images_to_zip!(zip_out)
     end
@@ -58,8 +68,10 @@ module Sablon
         Processor::Document
       elsif entry_name =~ %r{word/(?:header|footer)\d*\.xml}
         Processor::Document
-      elsif entry_name =~ %r{word/(?:endnotes|footnotes)\.xml}
+      elsif entry_name =~ %r{word/endnotes\.xml}
         Processor::Document
+      elsif entry_name =~ %r{word/footnotes\.xml}
+        Processor::Footnotes
       elsif entry_name == 'word/numbering.xml'
         Processor::Numbering
       elsif entry_name == '[Content_Types].xml'
@@ -69,7 +81,7 @@ module Sablon
 
     def process(entry_pattern, env, *args)
       @contents.each do |entry_name, content|
-        next unless entry_pattern =~ entry_name
+        next unless entry_name =~ entry_pattern
         env.current_entry = entry_name
         processor = get_processor(entry_name)
         processor.process(content, env, *args)

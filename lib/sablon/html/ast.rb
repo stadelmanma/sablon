@@ -74,6 +74,7 @@ module Sablon
       end
 
       def initialize(properties, children)
+        @attributes ||= {}
         @properties = filter_properties(properties)
         @children = children
       end
@@ -85,7 +86,8 @@ module Sablon
 
       def to_docx
         tag = self.class::WORD_ML_TAG
-        "<#{tag}>#{properties_to_docx}#{children.to_docx}</#{tag}>"
+        attr_str = attributes_to_docx unless @attributes.empty?
+        "<#{tag}#{attr_str}>#{properties_to_docx}#{children.to_docx}</#{tag}>"
       end
 
       def inspect
@@ -126,6 +128,11 @@ module Sablon
           value = format('w:val="%s" ', value) if value
           "<w:#{key} #{value}/>"
         end
+      end
+
+      def attributes_to_docx
+        attrs = @attributes.map { |k, v| format('%s="%s"', k, v) if v }
+        " #{attrs.join(' ')}"
       end
 
       def properties_to_docx
@@ -234,6 +241,73 @@ module Sablon
       end
     end
 
+    class Footnote < Node
+      WORD_ML_TAG = 'w:footnote'.freeze
+      attr_reader :placeholder
+      #
+      Reference = Struct.new(:ref_id) do
+        def accept(*_); end
+
+        def inspect
+          "<footnoteRef>"
+        end
+
+        def to_docx
+          <<-wordml.gsub(/^\s*/, '').delete("\n")
+            <w:r>
+              <w:rPr>
+                <w:rStyle w:val="FootnoteReference"/>
+              </w:rPr>
+              <w:footnoteRef/>
+            </w:r>
+          wordml
+        end
+      end
+
+      def initialize(properties, placeholder, children)
+        @placeholder = placeholder
+        children.nodes.insert(0, Reference.new)
+        super({}, Paragraph.new(properties, children))
+      end
+
+      def ref_id
+        @attributes['w:id']
+      end
+
+      def ref_id=(value)
+        @attributes = { 'w:id' => value }
+      end
+    end
+
+    class FootnoteReference < Node
+      PROPERTIES = Run::PROPERTIES
+      WORD_ML_TAG = Run::WORD_ML_TAG
+      STYLE_CONVERSION = Run::STYLE_CONVERSION
+      attr_reader :placeholder
+      #
+      Reference = Struct.new(:ref_id) do
+        def accept(*_); end
+
+        def inspect
+          "id=#{ref_id}"
+        end
+
+        def to_docx
+          id_str = "w:id=\"#{ref_id}\"" if ref_id
+          "<w:footnoteReference #{id_str}/>"
+        end
+      end
+
+      def initialize(properties, node)
+        @placeholder = node['placeholder']
+        super properties, Reference.new(node['id'])
+      end
+
+      def ref_id=(value)
+        @children = Reference.new(value)
+      end
+    end
+
     class Newline < Node
       def initialize; end
 
@@ -319,7 +393,7 @@ module Sablon
         'width' => lambda { |v|
           value = Table::STYLE_CONVERSION['width'].call(v)[1]
           return 'tcW', value
-        },
+        }
       }.freeze
     end
   end
