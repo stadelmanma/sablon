@@ -135,6 +135,7 @@ module Sablon
         's' => { 'strike' => 'true' },
         'sub' => { 'vertAlign' => 'subscript' },
         'sup' => { 'vertAlign' => 'superscript' },
+        'ins' => { 'noProof' => nil },
         'footnoteref' => { 'rStyle' => 'FootnoteReference' }
       }
 
@@ -248,6 +249,8 @@ module Sablon
           ref = FootnoteReference.new(local_props, node)
           @footnotes.new_references << ref unless node['id']
           ref
+        elsif node.name == 'ins'
+          ComplexField.generate(local_props, node)
         else
           ast_runs(node.children, local_props).nodes
         end

@@ -194,8 +194,8 @@ module Sablon
     end
 
     class Run < Node
-      PROPERTIES = %w[b i caps color dstrike emboss imprint highlight outline
-                      rStyle shadow shd smallCaps strike sz u vanish
+      PROPERTIES = %w[b i caps color dstrike emboss imprint highlight noProof
+                      outline rStyle shadow shd smallCaps strike sz u vanish
                       vertAlign].freeze
       WORD_ML_TAG = 'w:r'.freeze
       STYLE_CONVERSION = {
@@ -238,6 +238,18 @@ module Sablon
 
       def initialize(properties, string)
         super properties, Text.new(string)
+      end
+    end
+
+    class ComplexField
+      def self.generate(local_props, node)
+        [
+          Fldchar.new(local_props, 'begin'),
+          InstrText.new(local_props, node.text),
+          Fldchar.new(local_props, 'separate'),
+          Run.new(local_props, node['placeholder'] || ''),
+          Fldchar.new(local_props, 'end')
+        ]
       end
     end
 
@@ -317,6 +329,50 @@ module Sablon
 
       def inspect
         "<Newline>"
+      end
+    end
+
+    class Fldchar < Node
+      PROPERTIES = Run::PROPERTIES
+      WORD_ML_TAG = Run::WORD_ML_TAG
+      STYLE_CONVERSION = Run::STYLE_CONVERSION
+      #
+      CharType = Struct.new(:type) do
+        def accept(*_); end
+
+        def inspect
+          type
+        end
+
+        def to_docx
+          "<w:fldChar w:fldCharType=\"#{type}\"/>"
+        end
+      end
+
+      def initialize(properties, type)
+        super properties, CharType.new(type)
+      end
+    end
+
+    class InstrText < Node
+      PROPERTIES = Run::PROPERTIES
+      WORD_ML_TAG = Run::WORD_ML_TAG
+      STYLE_CONVERSION = Run::STYLE_CONVERSION
+      #
+      Instructions = Struct.new(:content) do
+        def accept(*_); end
+
+        def inspect
+          content
+        end
+
+        def to_docx
+          "<w:instrText xml:space=\"preserve\"> #{content} </w:instrText>"
+        end
+      end
+
+      def initialize(properties, content)
+        super properties, Instructions.new(content)
       end
     end
 

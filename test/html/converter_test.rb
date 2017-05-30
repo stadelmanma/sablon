@@ -446,6 +446,39 @@ class HTMLConverterTest < Sablon::TestCase
     assert_equal normalize_wordml(expected_output), process(input)
   end
 
+  def test_insertion_field_conversion
+    input = '<p><ins placeholder="{date}">DATE \\@ "yyyy-dd-MM hh:mm:ss"</ins></p>'
+    expected_output = <<-DOCX.strip
+      <w:p>
+        <w:pPr>
+          <w:pStyle w:val="Paragraph" />
+        </w:pPr>
+        <w:r>
+          <w:rPr><w:noProof /></w:rPr>
+          <w:fldChar w:fldCharType="begin"/>
+        </w:r>
+        <w:r>
+          <w:rPr><w:noProof /></w:rPr>
+          <w:instrText xml:space="preserve"> DATE \\@ "yyyy-dd-MM hh:mm:ss" </w:instrText>
+        </w:r>
+        <w:r>
+          <w:rPr><w:noProof /></w:rPr>
+          <w:fldChar w:fldCharType="separate"/>
+        </w:r>
+        <w:r>
+          <w:rPr><w:noProof /></w:rPr>
+          <w:t xml:space="preserve">{date}</w:t>
+        </w:r>
+        <w:r>
+          <w:rPr><w:noProof /></w:rPr>
+          <w:fldChar w:fldCharType="end"/>
+        </w:r>
+      </w:p>
+    DOCX
+    #
+    assert_equal normalize_wordml(expected_output), process(input)
+  end
+
   private
 
   def process(input)
@@ -1035,6 +1068,13 @@ class HTMLConverterASTTest < Sablon::TestCase
     assert_equal "2", @footnotes.new_footnotes[0].ref_id
     assert_equal "<Footnote{}: <Paragraph{pStyle=FootnoteText}: [<footnoteRef>, <Run{}: Lorem Ipsum>]>>", @footnotes.new_footnotes[0].inspect
     assert_equal "<Root: []>", ast.inspect
+  end
+
+  def test_insertion_field
+    input = '<p><ins placeholder="pg#">PAGE \\* MERGEFORMAT</ins></p>'
+    ast = @converter.processed_ast(input)
+    #
+    assert_equal "<Root: [<Paragraph{pStyle=Paragraph}: [<Fldchar{noProof}: begin>, <InstrText{noProof}: PAGE \\* MERGEFORMAT>, <Fldchar{noProof}: separate>, <Run{noProof}: pg#>, <Fldchar{noProof}: end>]>]>", ast.inspect
   end
 
   private
