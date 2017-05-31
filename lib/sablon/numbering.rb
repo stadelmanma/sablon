@@ -1,12 +1,7 @@
 module Sablon
   class Numbering
     attr_reader :definitions
-
-    Definition = Struct.new(:numid, :style) do
-      def inspect
-        "#<Numbering #{numid}:#{style}"
-      end
-    end
+    Definition = Struct.new(:numid, :style)
 
     def initialize
       @numid = 1000

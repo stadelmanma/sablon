@@ -1,11 +1,7 @@
 module Sablon
   # tracks images that need to be added to the document.
   class Images
-    Definition = Struct.new(:name, :data, :rid) do
-      def inspect
-        "#<Image #{name}:#{rid}"
-      end
-    end
+    Definition = Struct.new(:name, :data, :rid)
 
     def initialize
       @definitions = []
