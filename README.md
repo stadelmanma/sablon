@@ -128,8 +128,7 @@ This functionality was inspired in the [kubido fork](https://github.com/kubido/s
 
 ##### HTML
 
-Similar to WordProcessingML it's possible to use html as input while processing the template. You don't need to modify your templates, a simple insertion operation
-is sufficient:
+Similar to WordProcessingML it's possible to use html as input while processing the template. You don't need to modify your templates, a simple insertion operation is sufficient:
 
 ```
 «=article»
@@ -139,11 +138,61 @@ To use HTML insertion prepare the context like so:
 
 ```ruby
 html_body = <<-HTML
-<div>This text can contain <em>additional formatting</em>
-according to the <strong>HTML</strong> specification.</div>
-<p style="text-align: right; background-color: #FFFF00">Right aligned
-content with a yellow background color</p>
-<div><span style="color: #123456">Inline styles</span> are possible as well</div>
+<div>
+  This text can contain <em>additional formatting</em>
+  according to the <strong>HTML</strong> specification.
+</div>
+
+<p style="text-align: right; background-color: #FFFF00">
+  Right aligned content with a yellow background color
+</p>
+
+<div>
+  <span style="color: #123456">Inline styles</span> are possible as well
+</div>
+
+<h3>HTML tables can be parsed</h3>
+<table>
+  <tr>
+    <th>First Name</th><th>Last name</th>
+  </tr>
+  <tr>
+    <td>Foo</td><td>Bar<td>
+  </tr>
+</table>
+
+<h3>Footnotes</h3>
+<p>
+  It is possible to add new footnote references<footnoteref placeholder="test"/>
+  to your document as well. You will need at least one footnote in the template document so the docx archive contains the proper files and references. This pre-existing footnote can be wrapped in a comment block and does not have to be present in the final output.
+</p>
+<footnote placeholder="test">
+  My new footnote reference
+</footnote>
+
+<h3>Special Fields can be added</h3>
+<p>
+  There is support for the creation of new fields by using the "ins" tag. The content between the tags is directly used as the field instructions visible when "Toggle Field Codes" is clicked on. To output a literal backslash in some cases (i.e. ruby code) you will need to use two instead of one. To update all fields in the document use Ctrl+A, F9
+  <br>
+  Current Timestamp: <ins>DATE \\@ "yyyy-dd-MM hh:mm:ss"</ins>
+  <br>
+  You can create new merge fields this way, however they will not be processed by Sablon prior to insertion.
+  <ins placeholder="new_field">MERGEFIELD new_field \\* MERGEFORMAT</ins>
+</p>
+
+<h3>Bookmarks and Captions</h3>
+<p>
+  You can create new bookmarks in the document using 'bookmark' tags containing the desired content. Use dashes or underscores instead of spaces in the name attribute.
+  <br>
+  <bookmark name="test-new_name">Bookmarked Content</bookmark>
+  <br>
+  Existing and newly created bookmarks can be referenced using the previously mentioned 'ins' tag.
+  <ins>REF test-new_name \\h</ins>
+  <br>
+  <br>
+  Additionally, you can easily create captions using the 'caption' element. The type of caption and it's name are defined by attributes while the content of the caption goes between the tags, omitting the "Figure/Table/etc. ##" portion as it is added automatically.
+</p>
+<caption type="figure" name="fig-cap">My caption's content</caption>
 HTML
 context = {
   article: Sablon.content(:html, html_body) }
@@ -153,20 +202,22 @@ context = {
 template.render_to_file File.expand_path("~/Desktop/output.docx"), context
 ```
 
-Currently, HTML insertion is somewhat limited. It is recommended that the block level tags such as `p` and `div` are not nested within each other, otherwise the final document may not generate as anticipated. List tags (`ul` and `ol`) and inline tags (`span`, `b`, `em`, etc.) can be nested as deeply as needed.
+It is recommended that the block level tags are not nested within each other, otherwise the final document may not generate as anticipated. List tags (`ul` and `ol`) and inline tags (`span`, `b`, `em`, etc.) can be nested as deeply as needed, except for the `<ins>` tag, it can only contain plain text. Additionally, for best results it is best to define all styles being used inside a comment block so they are sure to be included in the final template. For an example see the insertion_template.docx file in test/fixtures.
 
 Not all tags are supported. Currently supported tags are defined in [converter.rb](lib/sablon/html/converter.rb) for paragraphs in method `prepare_paragraph` and for text runs in `prepare_run`.
 
-Basic conversion of CSS inline styles into matching WordML properties in supported through the `style=" ... "` attribute in the HTML markup. Not all possible styles are supported and only a small subset of CSS styles have a direct WordML equivalent. Styles are passed onto nested elements. The currently supported styles are also defined in [converter.rb](lib/sablon/html/converter.rb) in method `process_style`. Simple toggle properties that aren't directly supported can be added using the `text-decoration: ` style attribute with the proper WordML tag name as the value. Paragraph and Run property reference can be found at:
+Basic conversion of CSS inline styles into matching WordML properties in supported through the `style=" ... "` attribute in the HTML markup. Not all possible styles are supported and only a small subset of CSS styles have a direct WordML equivalent. Styles are passed onto nested elements. The currently supported styles are defined in [ast.rb](lib/sablon/html/ast.rb) for each WordML node type. Simple toggle properties that aren't directly supported can be added using the `text-decoration: ` style attribute with the proper WordML tag name as the value. Paragraph and Run property reference can be found at:
   * http://officeopenxml.com/WPparagraphProperties.php
   * http://officeopenxml.com/WPtextFormatting.php
 
 If you wish to write out your HTML code in an indented human readable fashion, or you are pulling content from the ERB templating engine in rails the following regular expression can help eliminate extraneous whitespace in the final document.
 ```ruby
+# define block level tags
+blk_tags = 'h\d|div|p|br|ul|ol|li|table|tr|th|td'
 # combine all white space
 html_str = html_str.gsub(/\s+/, ' ')
 # clear any white space between block level tags and other content
-html_str.gsub(%r{\s*<(/?(?:h\d|div|p|br|ul|ol|li).*?)>\s*}, '<\1>')
+html_str.gsub(%r{\s*<(/?(?:#{blk_tags}).*?)>\s*}, '<\1>')
 ```
 
 IMPORTANT: Currently, the insertion will replace the containing paragraph. This means that other content in the same paragraph is discarded.

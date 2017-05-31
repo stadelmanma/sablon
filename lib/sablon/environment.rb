@@ -6,6 +6,7 @@ module Sablon
     attr_reader :images
     attr_reader :numbering
     attr_reader :relationships
+    attr_reader :bookmarks
     attr_reader :footnotes
     attr_reader :context
 
@@ -38,6 +39,7 @@ module Sablon
         @template = parent_env.template
         @images = parent_env.images
         @numbering = parent_env.numbering
+        @bookmarks = parent_env.bookmarks
         @relationships = parent_env.relationships
         @footnotes = parent_env.footnotes
       else
@@ -45,6 +47,7 @@ module Sablon
         @template = template
         @images = Images.new
         @numbering = Numbering.new
+        @bookmarks = Bookmarks.new
         @relationships = Sablon::Processor::Relationships.new
         @footnotes = Sablon::Processor::Footnotes.new
       end

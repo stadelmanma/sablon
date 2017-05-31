@@ -33,6 +33,7 @@ module Sablon
       env = Sablon::Environment.new(self, context)
       env.relationships.initialize_rids(@contents)
       env.footnotes.initialize_footnotes(@contents['word/footnotes.xml'])
+      env.bookmarks.initialize_bookmark_ids(@contents['word/document.xml'])
       # process files
       process(%r{word/document.xml}, env, properties)
       process(%r{word/(?:header|footer)\d*\.xml}, env)

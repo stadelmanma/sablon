@@ -2,6 +2,7 @@ require 'zip'
 require 'nokogiri'
 
 require "sablon/version"
+require "sablon/bookmarks"
 require "sablon/numbering"
 require "sablon/images"
 require "sablon/context"

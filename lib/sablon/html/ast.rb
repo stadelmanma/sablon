@@ -241,15 +241,64 @@ module Sablon
       end
     end
 
-    class ComplexField
-      def self.generate(local_props, node)
-        [
+    class Bookmark < Collection
+      attr_reader :name
+      BookmarkTag = Struct.new(:type, :id,  :name) do
+        def accept(*_); end
+
+        def inspect
+          "<Bookmark#{type.capitalize}{id=#{id};name=#{name}}>"
+        end
+
+        def to_docx
+          "<w:bookmark#{type.capitalize}#{attr_str}/>"
+        end
+
+        def attr_str
+          attrs = {'w:id' => id, 'w:name' => name}
+          attrs = attrs.map { |k, v| format('%s="%s"', k, v) if v }
+          " #{attrs.compact.join(' ')}"
+        end
+      end
+
+      def initialize(name, children)
+        @name = name
+        children.insert(0, BookmarkTag.new('start', nil, @name))
+        children.push(BookmarkTag.new('end', nil, nil))
+        super(children)
+      end
+
+      def id=(value)
+        @nodes[0] = BookmarkTag.new('start', value, @name)
+        @nodes[-1] = BookmarkTag.new('end', value, nil)
+      end
+    end
+
+    class Caption < Paragraph
+      attr_reader :bookmark
+      def initialize(local_props, type, name, runs)
+        trans_props = Caption.transferred_properties(local_props)
+        type = type.capitalize
+        children = [
+          Run.new(trans_props, type),
+          ComplexField.new(trans_props, "SEQ #{type} \\# \" # \"", ' # ')
+        ]
+        @bookmark = Bookmark.new(name, children)
+        runs.nodes.insert(0, @bookmark)
+        super(local_props, runs)
+      end
+    end
+
+    class ComplexField < Collection
+      def initialize(local_props, instr, placeholder)
+        children = [
           Fldchar.new(local_props, 'begin'),
-          InstrText.new(local_props, node.text),
+          InstrText.new(local_props, instr),
           Fldchar.new(local_props, 'separate'),
-          Run.new(local_props, node['placeholder'] || ''),
+          Run.new(local_props, placeholder || ''),
           Fldchar.new(local_props, 'end')
         ]
+        super(children)
       end
     end
 

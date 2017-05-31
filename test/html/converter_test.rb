@@ -479,6 +479,71 @@ class HTMLConverterTest < Sablon::TestCase
     assert_equal normalize_wordml(expected_output), process(input)
   end
 
+  def test_bookmark_conversion
+    input = '<p><bookmark name="test">Lorem</bookmark> Ipsum</p>'
+    expected_output = <<-DOCX.strip
+      <w:p>
+        <w:pPr>
+          <w:pStyle w:val="Paragraph" />
+        </w:pPr>
+        <w:bookmarkStart w:id="1" w:name="test"/>
+        <w:r>
+          <w:t xml:space="preserve">Lorem</w:t>
+        </w:r>
+        <w:bookmarkEnd w:id="1"/>
+        <w:r>
+          <w:t xml:space="preserve"> Ipsum</w:t>
+        </w:r>
+      </w:p>
+    DOCX
+    #
+    assert_equal normalize_wordml(expected_output), process(input)
+  end
+
+  def test_nonunique_bookmark_name
+    input = '<p><bookmark name="test">Lorem</bookmark> <bookmark name="test">Ipsum</bookmark></p>'
+    e = assert_raises Sablon::ContextError do
+      process(input)
+    end
+    assert_equal "Bookmark name already in use: test", e.message
+  end
+
+  def test_caption_conversion
+    input = '<caption type="table" name="tab-data">Lorem Ipsum</caption>'
+    expected_output = <<-DOCX.strip
+      <w:p>
+        <w:pPr>
+          <w:pStyle w:val="Caption" />
+        </w:pPr>
+        <w:bookmarkStart w:id="1" w:name="tab-data"/>
+        <w:r>
+          <w:t xml:space="preserve">Table</w:t>
+        </w:r>
+        <w:r>
+          <w:fldChar w:fldCharType="begin"/>
+        </w:r>
+        <w:r>
+          <w:instrText xml:space="preserve"> SEQ Table \\# " # " </w:instrText>
+        </w:r>
+        <w:r>
+          <w:fldChar w:fldCharType="separate"/>
+        </w:r>
+        <w:r>
+          <w:t xml:space="preserve"> # </w:t>
+        </w:r>
+        <w:r>
+          <w:fldChar w:fldCharType="end"/>
+        </w:r>
+        <w:bookmarkEnd w:id="1"/>
+        <w:r>
+          <w:t xml:space="preserve">Lorem Ipsum</w:t>
+        </w:r>
+      </w:p>
+    DOCX
+    #
+    assert_equal normalize_wordml(expected_output), process(input)
+  end
+
   private
 
   def process(input)
@@ -946,10 +1011,14 @@ end
 class HTMLConverterASTTest < Sablon::TestCase
   def setup
     super
-    @footnotes = Sablon::Environment.new(nil).footnotes
+    env = Sablon::Environment.new(nil)
+    @bookmarks = env.bookmarks
+    @footnotes = env.footnotes
     @footnotes.instance_variable_set(:@counter, 1)
+    #
     @converter = Sablon::HTMLConverter.new
-    @converter.instance_variable_set(:@numbering, Sablon::Environment.new(nil).numbering)
+    @converter.instance_variable_set(:@bookmarks, @bookmarks)
+    @converter.instance_variable_set(:@numbering, env.numbering)
     @converter.instance_variable_set(:@footnotes, @footnotes)
   end
 
@@ -1074,7 +1143,25 @@ class HTMLConverterASTTest < Sablon::TestCase
     input = '<p><ins placeholder="pg#">PAGE \\* MERGEFORMAT</ins></p>'
     ast = @converter.processed_ast(input)
     #
-    assert_equal "<Root: [<Paragraph{pStyle=Paragraph}: [<Fldchar{noProof}: begin>, <InstrText{noProof}: PAGE \\* MERGEFORMAT>, <Fldchar{noProof}: separate>, <Run{noProof}: pg#>, <Fldchar{noProof}: end>]>]>", ast.inspect
+    assert_equal "<Root: [<Paragraph{pStyle=Paragraph}: [[<Fldchar{noProof}: begin>, <InstrText{noProof}: PAGE \\* MERGEFORMAT>, <Fldchar{noProof}: separate>, <Run{noProof}: pg#>, <Fldchar{noProof}: end>]]>]>", ast.inspect
+  end
+
+  def test_bookmark
+    input = '<p><bookmark name="test">Lorem</bookmark> Ipsum</p>'
+    ast = @converter.processed_ast(input)
+    #
+    assert_equal "<Root: [<Paragraph{pStyle=Paragraph}: [[<BookmarkStart{id=1;name=test}>, <Run{}: Lorem>, <BookmarkEnd{id=1;name=}>], <Run{}:  Ipsum>]>]>", ast.inspect
+    assert_equal @bookmarks.instance_variable_get(:@counter), 1
+    assert_equal @bookmarks.instance_variable_get(:@names), ['test']
+  end
+
+  def test_caption
+    input = '<caption type="Equation" name="test-eqn">Lorem</caption>'
+    ast = @converter.processed_ast(input)
+    #
+    assert_equal "<Root: [<Caption{pStyle=Caption}: [[<BookmarkStart{id=1;name=test-eqn}>, <Run{}: Equation>, [<Fldchar{}: begin>, <InstrText{}: SEQ Equation \\# \" # \">, <Fldchar{}: separate>, <Run{}:  # >, <Fldchar{}: end>], <BookmarkEnd{id=1;name=}>], <Run{}: Lorem>]>]>", ast.inspect
+    assert_equal @bookmarks.instance_variable_get(:@counter), 1
+    assert_equal @bookmarks.instance_variable_get(:@names), ['test-eqn']
   end
 
   private

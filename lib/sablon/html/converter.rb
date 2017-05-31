@@ -65,6 +65,7 @@ module Sablon
     end
 
     def process(input, env)
+      @bookmarks = env.bookmarks
       @numbering = env.numbering
       @footnotes = env.footnotes
       ast = processed_ast(input)
@@ -100,16 +101,17 @@ module Sablon
     def prepare_paragraph(node, properties = {})
       # determine conversion class for table separately.
       node_cls = { 'table' => Table, 'tr' => TableRow, 'td' => TableCell,
-                   'th' => TableCell, 'footnote' => Footnote }
+                   'th' => TableCell, 'footnote' => Footnote,
+                   'caption' => Caption }
       node_cls.default = Paragraph
       # set default styles based on HTML element allowing for h1, h2, etc.
       styles = Hash.new do |hash, key|
         tag, num = key.match(/([a-z]+)(\d*)/)[1..2]
-        { 'pStyle' => hash[tag]['pStyle'] + num } if hash[tag]
+        { 'pStyle' => hash[tag]['pStyle'] + num } if hash.key? tag
       end
       styles.merge!('div' => 'Normal', 'p' => 'Paragraph', 'h' => 'Heading',
                     'table' => nil, 'tr' => nil, 'td' => nil,
-                    'footnote' => 'FootnoteText',
+                    'footnote' => 'FootnoteText', 'caption' => 'Caption',
                     'ul' => 'ListBullet', 'ol' => 'ListNumber')
       styles['li'] = @definition.style if @definition
       styles.each { |k, v| styles[k] = v ? { 'pStyle' => v } : {} }
@@ -136,7 +138,8 @@ module Sablon
         'sub' => { 'vertAlign' => 'subscript' },
         'sup' => { 'vertAlign' => 'superscript' },
         'ins' => { 'noProof' => nil },
-        'footnoteref' => { 'rStyle' => 'FootnoteReference' }
+        'footnoteref' => { 'rStyle' => 'FootnoteReference' },
+        'bookmark' => {}
       }
 
       unless styles.key?(node.name)
@@ -189,8 +192,14 @@ module Sablon
         properties['numPr'] = [
           { 'ilvl' => @builder.ilvl }, { 'numId' => @definition.numid }
         ]
+      elsif node.name == 'caption'
+        trans_props = Caption.transferred_properties(properties)
+        caption = Caption.new(properties, node['type'], node['name'], ast_runs(node.children, trans_props))
+        @bookmarks << caption.bookmark
+        @builder.new_layer
+        @builder.emit caption
+        return
       elsif node.name == 'footnote'
-        properties = prepare_paragraph(node)
         trans_props = Footnote.transferred_properties(properties)
         @footnotes << Footnote.new(properties, node['placeholder'], ast_runs(node.children, trans_props))
         return
@@ -243,6 +252,11 @@ module Sablon
         #
         if node.text?
           Run.new(local_props, node.text)
+        elsif node.name == 'bookmark'
+          child_nodes = ast_runs(node.children, local_props).nodes
+          bookmark = Bookmark.new(node['name'], child_nodes)
+          @bookmarks << bookmark
+          bookmark
         elsif node.name == 'br'
           Newline.new
         elsif node.name == 'footnoteref'
@@ -250,7 +264,7 @@ module Sablon
           @footnotes.new_references << ref unless node['id']
           ref
         elsif node.name == 'ins'
-          ComplexField.generate(local_props, node)
+          ComplexField.new(local_props, node.text, node['placeholder'])
         else
           ast_runs(node.children, local_props).nodes
         end
