@@ -281,7 +281,7 @@ module Sablon
         type = type.capitalize
         children = [
           Run.new(trans_props, type),
-          ComplexField.new(trans_props, "SEQ #{type} \\# \" # \"", ' # ')
+          ComplexField.new(trans_props, "SEQ #{type} \\# \" #\"", ' #')
         ]
         @bookmark = Bookmark.new(name, children)
         runs.nodes.insert(0, @bookmark)
