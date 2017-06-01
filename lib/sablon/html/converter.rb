@@ -139,7 +139,11 @@ module Sablon
         'sup' => { 'vertAlign' => 'superscript' },
         'ins' => { 'noProof' => nil },
         'footnoteref' => { 'rStyle' => 'FootnoteReference' },
-        'bookmark' => {}
+        'bookmark' => {},
+        'bgcyan' => { 'shd' => { val: 'clear', fill: '00FFFF' } },
+        'bggreen' => { 'shd' => { val: 'clear', fill: '00FFFF' } },
+        'bgmagenta' => { 'shd' => { val: 'clear', fill: '00FFFF' } },
+        'bgyellow' => { 'shd' => { val: 'clear', fill: '00FFFF' } }
       }
 
       unless styles.key?(node.name)
