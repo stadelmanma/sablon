@@ -141,9 +141,9 @@ module Sablon
         'footnoteref' => { 'rStyle' => 'FootnoteReference' },
         'bookmark' => {},
         'bgcyan' => { 'shd' => { val: 'clear', fill: '00FFFF' } },
-        'bggreen' => { 'shd' => { val: 'clear', fill: '00FFFF' } },
-        'bgmagenta' => { 'shd' => { val: 'clear', fill: '00FFFF' } },
-        'bgyellow' => { 'shd' => { val: 'clear', fill: '00FFFF' } }
+        'bggreen' => { 'shd' => { val: 'clear', fill: '00FF00' } },
+        'bgmagenta' => { 'shd' => { val: 'clear', fill: 'FF00FF' } },
+        'bgyellow' => { 'shd' => { val: 'clear', fill: 'FFFF00' } }
       }
 
       unless styles.key?(node.name)
