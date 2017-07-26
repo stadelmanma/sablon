@@ -140,10 +140,11 @@ module Sablon
         'ins' => { 'noProof' => nil },
         'footnoteref' => { 'rStyle' => 'FootnoteReference' },
         'bookmark' => {},
-        'bgcyan' => { 'shd' => { val: 'clear', fill: '00FFFF' } },
-        'bggreen' => { 'shd' => { val: 'clear', fill: '00FF00' } },
-        'bgmagenta' => { 'shd' => { val: 'clear', fill: 'FF00FF' } },
-        'bgyellow' => { 'shd' => { val: 'clear', fill: 'FFFF00' } }
+        'bgcyan' => { 'highlight' => { val: 'cyan' } },
+        'bggreen' => { 'highlight' => { val: 'green' } },
+        'bgmagenta' => { 'highlight' => { val: 'magenta' } },
+        'bgyellow' => { 'highlight' => { val: 'yellow' } },
+        'bgwhite' => { 'highlight' => { val: 'white' } }
       }
 
       unless styles.key?(node.name)
