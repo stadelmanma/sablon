@@ -4,7 +4,7 @@ module Sablon
   class HTMLConverter
     # A top level abstract class to handle common logic for all AST nodes
     class Node
-      #attr_reader :children
+      attr_reader :children
       PROPERTIES = [].freeze
       FORCE_TRANSFER = [].freeze
 
@@ -66,46 +66,41 @@ module Sablon
 
     class NodeProperties
       attr_reader :transferred_properties
-      attr_accessor :force_transfer
+      attr_reader :force_transfer
 
       def self.paragraph(properties)
-        obj = new('w:pPr', properties, Paragraph::PROPERTIES)
-        obj.force_transfer = Paragraph::FORCE_TRANSFER
+        obj = new('w:pPr', properties, Paragraph::PROPERTIES, Paragraph::FORCE_TRANSFER)
         #
         obj
       end
 
       def self.run(properties)
-        obj = new('w:rPr', properties, Run::PROPERTIES)
-        obj.force_transfer = Run::FORCE_TRANSFER
+        obj = new('w:rPr', properties, Run::PROPERTIES, Run::FORCE_TRANSFER)
         #
         obj
       end
 
       def self.table(properties)
-        obj = new('w:tblPr', properties, Table::PROPERTIES)
-        obj.force_transfer = Table::FORCE_TRANSFER
+        obj = new('w:tblPr', properties, Table::PROPERTIES, Table::FORCE_TRANSFER)
         #
         obj
       end
 
       def self.table_row(properties)
-        obj = new('w:trPr', properties, TableRow::PROPERTIES)
-        obj.force_transfer = TableRow::FORCE_TRANSFER
+        obj = new('w:trPr', properties, TableRow::PROPERTIES, TableRow::FORCE_TRANSFER)
         #
         obj
       end
 
       def self.table_cell(properties)
-        obj = new('w:tcPr', properties, TableCell::PROPERTIES)
-        obj.force_transfer = TableCell::FORCE_TRANSFER
+        obj = new('w:tcPr', properties, TableCell::PROPERTIES, TableCell::FORCE_TRANSFER)
         #
         obj
       end
 
-      def initialize(tagname, properties, whitelist)
+      def initialize(tagname, properties, whitelist, force_transfer = [])
         @tagname = tagname
-        filter_properties(properties, whitelist)
+        filter_properties(properties, whitelist, force_transfer)
       end
 
       def inspect
@@ -129,7 +124,7 @@ module Sablon
       # processes properties adding those on the whitelist to the
       # properties instance variable and those not to the transferred_properties
       # isntance variable
-      def filter_properties(properties, whitelist)
+      def filter_properties(properties, whitelist, force_transfer)
         @transferred_properties = {}
         @properties = {}
         #
@@ -214,28 +209,56 @@ module Sablon
       PROPERTIES = %w[framePr ind jc keepLines keepNext numPr
                       outlineLvl pBdr pStyle rPr sectPr shd spacing
                       tabs textAlignment].freeze
-      attr_accessor :runs
 
       def initialize(env, node, properties)
         properties = self.class.process_properties(properties)
         @properties = NodeProperties.paragraph(properties)
         #
         trans_props = transferred_properties
-        @runs = ASTBuilder.html_to_ast(env, node.children, trans_props)
-        @runs = Collection.new(@runs)
+        @children = ASTBuilder.html_to_ast(env, node.children, trans_props)
+        @children = Collection.new(@children)
       end
 
       def to_docx
-        "<w:p>#{@properties.to_docx}#{runs.to_docx}</w:p>"
+        "<w:p>#{@properties.to_docx}#{@children.to_docx}</w:p>"
       end
 
       def accept(visitor)
         super
-        runs.accept(visitor)
+        @children.accept(visitor)
       end
 
       def inspect
-        "<Paragraph{#{@properties[:pStyle]}}: #{runs.inspect}>"
+        "<Paragraph{#{@properties[:pStyle]}}: #{@children.inspect}>"
+      end
+    end
+
+    # Create a run of text in the document
+    class Run < Node
+      PROPERTIES = %w[b i caps color dstrike emboss imprint highlight outline
+                      rStyle shadow shd smallCaps strike sz u vanish
+                      vertAlign].freeze
+      attr_reader :string
+
+      def initialize(_env, node, properties)
+        properties = self.class.process_properties(properties)
+        @properties = NodeProperties.run(properties)
+        @string = node.text
+      end
+
+      def to_docx
+        "<w:r>#{@properties.to_docx}#{text}</w:r>"
+      end
+
+      def inspect
+        "<Run{#{@properties.inspect}}: #{string}>"
+      end
+
+      private
+
+      def text
+        content = @string.tr("\u00A0", ' ')
+        "<w:t xml:space=\"preserve\">#{content}</w:t>"
       end
     end
 
@@ -250,7 +273,7 @@ module Sablon
         pseudo_nodes = Nokogiri::XML.fragment(pseudo_nodes)
         #
         bookmark = Bookmark.new(env, pseudo_nodes, properties)
-        @runs.nodes.insert(0, bookmark)
+        @children.nodes.insert(0, bookmark)
       end
     end
 
@@ -265,21 +288,21 @@ module Sablon
         @properties = NodeProperties.table(properties)
         #
         trans_props = transferred_properties
-        @nodes = ASTBuilder.html_to_ast(env, node.children, trans_props)
-        @nodes = Collection.new(@nodes)
+        @children = ASTBuilder.html_to_ast(env, node.children, trans_props)
+        @children = Collection.new(@children)
       end
 
       def to_docx
-        "<w:tbl>#{@properties.to_docx}#{@nodes.to_docx}</w:tbl>"
+        "<w:tbl>#{@properties.to_docx}#{@children.to_docx}</w:tbl>"
       end
 
       def accept(visitor)
         super
-        @nodes.accept(visitor)
+        @children.accept(visitor)
       end
 
       def inspect
-        "<#{self.class.node_name}{#{@properties.inspect}}: #{@nodes.inspect}>"
+        "<#{self.class.node_name}{#{@properties.inspect}}: #{@children.inspect}>"
       end
     end
 
@@ -292,12 +315,12 @@ module Sablon
         @properties = NodeProperties.table_row(properties)
         #
         trans_props = transferred_properties
-        @nodes = ASTBuilder.html_to_ast(env, node.children, trans_props)
-        @nodes = Collection.new(@nodes)
+        @children = ASTBuilder.html_to_ast(env, node.children, trans_props)
+        @children = Collection.new(@children)
       end
 
       def to_docx
-        "<w:tr>#{@properties.to_docx}#{@nodes.to_docx}</w:tr>"
+        "<w:tr>#{@properties.to_docx}#{@children.to_docx}</w:tr>"
       end
     end
 
@@ -311,11 +334,11 @@ module Sablon
         @properties = NodeProperties.table_cell(properties)
         #
         trans_props = transferred_properties
-        @nodes = Paragraph.new(env, node, trans_props)
+        @children = Paragraph.new(env, node, trans_props)
       end
 
       def to_docx
-        "<w:tc>#{@properties.to_docx}#{@nodes.to_docx}</w:tc>"
+        "<w:tc>#{@properties.to_docx}#{@children.to_docx}</w:tc>"
       end
     end
 
@@ -429,8 +452,8 @@ module Sablon
 
       def initialize(env, node, properties)
         @placeholder = placeholder
-        @paragraph = Paragraph.new(env, node, properties)
-        @paragraph.runs.nodes.unshift(Reference.new)
+        @children = Paragraph.new(env, node, properties)
+        @children.children.nodes.unshift(Reference.new)
         env.footnotes << self
       end
 
@@ -443,16 +466,16 @@ module Sablon
       end
 
       def to_docx
-        "<w:footnote>#{@paragraph.to_docx}</w:footnote>"
+        "<w:footnote>#{@children.to_docx}</w:footnote>"
       end
 
       def accept(visitor)
         super
-        @paragraph.accept(visitor)
+        @children.accept(visitor)
       end
 
       def inspect
-        "<Footnote: #{@paragraph.inspect}>"
+        "<Footnote: #{@children.inspect}>"
       end
     end
 
@@ -514,21 +537,21 @@ module Sablon
 
       def initialize(env, node, _properties)
         @name = node['name']
-        @nodes[0] = BookmarkTag.new('start', value, @name)
-        @nodes.concat ASTBuilder.html_to_ast(env, node.children, {})
-        @nodes << BookmarkTag.new('end', nil, nil)
+        @children[0] = BookmarkTag.new('start', value, @name)
+        @children.concat ASTBuilder.html_to_ast(env, node.children, {})
+        @children << BookmarkTag.new('end', nil, nil)
         env.bookmarks << self
       end
 
       def id=(value)
-        @nodes[0] = BookmarkTag.new('start', value, @name)
-        @nodes[-1] = BookmarkTag.new('end', value, nil)
+        @children[0] = BookmarkTag.new('start', value, @name)
+        @children[-1] = BookmarkTag.new('end', value, nil)
       end
     end
 
     class ComplexField < Collection
       def initialize(_env, node, properties)
-        @nodes = [
+        @children = [
           FldChar.new(properties, 'begin'),
           InstrText.new(properties, node.text),
           FldChar.new(properties, 'separate'),
@@ -538,37 +561,8 @@ module Sablon
       end
     end
 
-    # Create a run of text in the document
-    class Run < Node
-      PROPERTIES = %w[b i caps color dstrike emboss imprint highlight outline
-                      rStyle shadow shd smallCaps strike sz u vanish
-                      vertAlign].freeze
-      attr_reader :string
-
-      def initialize(_env, node, properties)
-        properties = self.class.process_properties(properties)
-        @properties = NodeProperties.run(properties)
-        @string = node.text
-      end
-
-      def to_docx
-        "<w:r>#{@properties.to_docx}#{text}</w:r>"
-      end
-
-      def inspect
-        "<Run{#{@properties.inspect}}: #{string}>"
-      end
-
-      private
-
-      def text
-        content = @string.tr("\u00A0", ' ')
-        "<w:t xml:space=\"preserve\">#{content}</w:t>"
-      end
-    end
-
     # isn't meant to be created directly from an HTML node
-    class Fldchar < Run
+    class FldChar < Run
       #
       CharType = Struct.new(:type) do
         def accept(*_); end
