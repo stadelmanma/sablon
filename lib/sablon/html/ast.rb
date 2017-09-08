@@ -235,8 +235,8 @@ module Sablon
 
     # Create a run of text in the document
     class Run < Node
-      PROPERTIES = %w[b i caps color dstrike emboss imprint highlight outline
-                      rStyle shadow shd smallCaps strike sz u vanish
+      PROPERTIES = %w[b i caps color dstrike emboss imprint highlight noProof
+                      outline rStyle shadow shd smallCaps strike sz u vanish
                       vertAlign].freeze
       attr_reader :string
 
@@ -519,7 +519,7 @@ module Sablon
         # "Type (number)"
         node.children.remove
         node.add_child type
-        node.add_child "<ins placeholder=' #'>SEQ #{type} # \" #\"</ins>"
+        node.add_child %(<ins placeholder=" #">SEQ #{type} \\# " #"</ins>)
         #
         bookmark = Bookmark.new(env, node, properties)
         @children.nodes.insert(0, bookmark)
@@ -575,7 +575,7 @@ module Sablon
       end
     end
 
-    # isn't meant to be created directly from an HTML node
+    # isn't meant to be created directly from a HTML node
     class FldChar < Run
       #
       CharType = Struct.new(:type) do
@@ -592,7 +592,7 @@ module Sablon
 
       def initialize(properties, type)
         @type = CharType.new(type)
-        @properties = NodeProperties.run(properties)
+        @properties = NodeProperties.run(properties.merge(noProof: nil))
       end
 
       def inspect

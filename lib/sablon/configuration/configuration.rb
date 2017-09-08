@@ -89,7 +89,7 @@ module Sablon
         bookmark: { type: :inline, ast_class: :bookmark },
         text: { type: :inline, ast_class: :run, properties: {}, allowed_children: [] },
         br: { type: :inline, ast_class: :newline, properties: {}, allowed_children: [] },
-        ins: { type: :inline, ast_class: :complex_field, properties: { noProof: nil }, allowed_children: [] },
+        ins: { type: :inline, ast_class: :complex_field, properties: { noProof: nil }, allowed_children: %i[text] },
         footnoteref: { type: :inline, ast_class: :footnote_reference, properties: { rStyle: 'FootnoteReference' }, allowed_children: [] },
       }
       # add all tags to the config object
