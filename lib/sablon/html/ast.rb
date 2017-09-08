@@ -69,33 +69,27 @@ module Sablon
       attr_reader :force_transfer
 
       def self.paragraph(properties)
-        obj = new('w:pPr', properties, Paragraph::PROPERTIES, Paragraph::FORCE_TRANSFER)
-        #
-        obj
+        _factory_init('w:pPr', properties, Paragraph)
       end
 
       def self.run(properties)
-        obj = new('w:rPr', properties, Run::PROPERTIES, Run::FORCE_TRANSFER)
-        #
-        obj
+        _factory_init('w:rPr', properties, Run)
       end
 
       def self.table(properties)
-        obj = new('w:tblPr', properties, Table::PROPERTIES, Table::FORCE_TRANSFER)
-        #
-        obj
+        _factory_init('w:tblPr', properties, Table)
       end
 
       def self.table_row(properties)
-        obj = new('w:trPr', properties, TableRow::PROPERTIES, TableRow::FORCE_TRANSFER)
-        #
-        obj
+        _factory_init('w:trPr', properties, TableRow)
       end
 
       def self.table_cell(properties)
-        obj = new('w:tcPr', properties, TableCell::PROPERTIES, TableCell::FORCE_TRANSFER)
-        #
-        obj
+        _factory_init('w:tcPr', properties, TableCell)
+      end
+
+      def self._factory_init(tagname, properties, klass)
+        new(tagname, properties, klass::PROPERTIES, klass::FORCE_TRANSFER)
       end
 
       def initialize(tagname, properties, whitelist, force_transfer = [])
