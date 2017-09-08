@@ -229,7 +229,7 @@ module Sablon
       end
 
       def inspect
-        "<Paragraph{#{@properties[:pStyle]}}: #{@children.inspect}>"
+        "<Paragraph{#{@properties.inspect}}: #{@children.inspect}>"
       end
     end
 
@@ -262,21 +262,6 @@ module Sablon
       end
     end
 
-    class Caption < Paragraph
-      def initialize(env, node, properties)
-        super
-        type = node['type'].capitalize
-        pseudo_nodes = <<-html.strip
-          #{type}
-          <ins placeholder=' #'>SEQ #{type} # \" #\"</ins>
-        html
-        pseudo_nodes = Nokogiri::XML.fragment(pseudo_nodes)
-        #
-        bookmark = Bookmark.new(env, pseudo_nodes, properties)
-        @children.nodes.insert(0, bookmark)
-      end
-    end
-
     class Table < Node
       PROPERTIES = %w[jc shd tblBorders tblCaption tblCellMar tblCellSpacing
                       tblInd tblLayout tblLook tblOverlap tblpPr tblStyle
@@ -284,9 +269,15 @@ module Sablon
       FORCE_TRANSFER = %w[shd].freeze
 
       def initialize(env, node, properties)
+        # strip text nodes from the root level element, these are typically
+        # extra whitespace from indenting the markup
+        node.search('./text()').remove
+
+        # Process properties
         properties = self.class.process_properties(properties)
         @properties = NodeProperties.table(properties)
-        #
+
+        # convert child nodes and pass on properties not retained by the parent
         trans_props = transferred_properties
         @children = ASTBuilder.html_to_ast(env, node.children, trans_props)
         @children = Collection.new(@children)
@@ -451,7 +442,7 @@ module Sablon
       end
 
       def initialize(env, node, properties)
-        @placeholder = placeholder
+        @placeholder = node['placeholder']
         @children = Paragraph.new(env, node, properties)
         @children.children.nodes.unshift(Reference.new)
         env.footnotes << self
@@ -465,8 +456,13 @@ module Sablon
         @attributes = { 'w:id' => value }
       end
 
-      def to_docx
-        "<w:footnote>#{@children.to_docx}</w:footnote>"
+      def to_docx(in_footnotes_xml = false)
+        if in_footnotes_xml
+          attr_str = @attributes.map { |k, v| %(#{k}="#{v}") }.join(' ')
+          "<w:footnote #{attr_str}>#{@children.to_docx}</w:footnote>"
+        else
+          ''
+        end
       end
 
       def accept(visitor)
@@ -490,15 +486,15 @@ module Sablon
         end
 
         def to_docx
-          id_str = "w:id=\"#{ref_id}\"" if ref_id
+          id_str = %(w:id="#{ref_id}") if ref_id
           "<w:footnoteReference #{id_str}/>"
         end
       end
 
-      def initialize(_env, node, properties)
+      def initialize(env, node, properties)
         @properties = NodeProperties.run(properties)
         @placeholder = node['placeholder']
-        @ref = Reference.new(node['id'])
+        @children = Reference.new(node['id'])
         env.footnotes.new_references << self unless node['id']
       end
 
@@ -507,11 +503,26 @@ module Sablon
       end
 
       def inspect
-        "<FootnoteReference{#{@properties.inspect}}: #{@ref.inspect}>"
+        "<FootnoteReference{#{@properties.inspect}}: #{@children.inspect}>"
       end
 
       def to_docx
-        "<w:r>#{@properties.to_docx}#{@ref.to_docx}</w:r>"
+        "<w:r>#{@properties.to_docx}#{@children.to_docx}</w:r>"
+      end
+    end
+
+    class Caption < Paragraph
+      def initialize(env, node, properties)
+        super
+        type = node['type'].capitalize
+        # remove all children to create a proper bookmark that only encompasses
+        # "Type (number)"
+        node.children.remove
+        node.add_child type
+        node.add_child "<ins placeholder=' #'>SEQ #{type} # \" #\"</ins>"
+        #
+        bookmark = Bookmark.new(env, node, properties)
+        @children.nodes.insert(0, bookmark)
       end
     end
 
@@ -537,10 +548,11 @@ module Sablon
 
       def initialize(env, node, _properties)
         @name = node['name']
-        @children[0] = BookmarkTag.new('start', value, @name)
+        @children = [BookmarkTag.new('start', nil, @name)]
         @children.concat ASTBuilder.html_to_ast(env, node.children, {})
         @children << BookmarkTag.new('end', nil, nil)
         env.bookmarks << self
+        super(@children)
       end
 
       def id=(value)
@@ -550,14 +562,16 @@ module Sablon
     end
 
     class ComplexField < Collection
-      def initialize(_env, node, properties)
+      def initialize(env, node, properties)
+        pseudo_node = Struct.new(:text).new(node['placeholder'].to_s)
         @children = [
           FldChar.new(properties, 'begin'),
           InstrText.new(properties, node.text),
           FldChar.new(properties, 'separate'),
-          Run.new(properties, node['placeholder'] || ''),
+          Run.new(env, pseudo_node, properties),
           FldChar.new(properties, 'end')
         ]
+        super(@children)
       end
     end
 

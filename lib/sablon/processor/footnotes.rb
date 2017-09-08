@@ -11,7 +11,7 @@ module Sablon
         # add all new footnotes to the file
         footnote_parent = xml_node.at_xpath('.//w:footnotes')
         env.footnotes.new_footnotes.each do |footnote|
-          footnote_parent.add_child(footnote.to_docx)
+          footnote_parent.add_child(footnote.to_docx(true))
         end
         #
         xml_node
