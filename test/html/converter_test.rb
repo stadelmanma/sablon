@@ -404,8 +404,8 @@ class HTMLConverterTest < Sablon::TestCase
     expected_output = <<-DOCX.strip
       <w:footnote w:id="2">
         <w:p>
-          <w:pPr><
-            w:pStyle w:val="FootnoteText" />
+          <w:pPr>
+              <w:pStyle w:val="FootnoteText" />
           </w:pPr>
           <w:r>
             <w:rPr>
@@ -421,7 +421,7 @@ class HTMLConverterTest < Sablon::TestCase
     DOCX
     #
     assert_equal '', process(input)
-    assert_equal normalize_wordml(expected_output), @footnotes.new_footnotes[0].to_docx
+    assert_equal normalize_wordml(expected_output), @footnotes.new_footnotes[0].to_docx(true)
   end
 
   def test_footnote_and_ref_conversion
@@ -520,18 +520,33 @@ class HTMLConverterTest < Sablon::TestCase
           <w:t xml:space="preserve">Table</w:t>
         </w:r>
         <w:r>
+          <w:rPr>
+            <w:noProof />
+          </w:rPr>
           <w:fldChar w:fldCharType="begin"/>
         </w:r>
         <w:r>
-          <w:instrText xml:space="preserve"> SEQ Table \\# " # " </w:instrText>
+          <w:rPr>
+            <w:noProof />
+          </w:rPr>
+          <w:instrText xml:space="preserve"> SEQ Table \\# " #" </w:instrText>
         </w:r>
         <w:r>
+          <w:rPr>
+            <w:noProof />
+          </w:rPr>
           <w:fldChar w:fldCharType="separate"/>
         </w:r>
         <w:r>
-          <w:t xml:space="preserve"> # </w:t>
+          <w:rPr>
+            <w:noProof />
+          </w:rPr>
+          <w:t xml:space="preserve"> #</w:t>
         </w:r>
         <w:r>
+          <w:rPr>
+            <w:noProof />
+          </w:rPr>
           <w:fldChar w:fldCharType="end"/>
         </w:r>
         <w:bookmarkEnd w:id="1"/>
@@ -747,8 +762,8 @@ class HTMLConverterStyleTest < Sablon::TestCase
     expected_output = <<-DOCX.strip
       <w:p>
         <w:pPr>
-          <w:jc w:val="center" />
           <w:pStyle w:val="Paragraph" />
+          <w:jc w:val="center" />
         </w:pPr>
         <w:r>
           <w:rPr>
@@ -953,7 +968,7 @@ class HTMLConverterStyleTest < Sablon::TestCase
   end
 
   def para_with_ppr(ppr_str)
-    para_str = '<w:p><w:pPr>%s<w:pStyle w:val="Paragraph" /></w:pPr></w:p>'
+    para_str = '<w:p><w:pPr><w:pStyle w:val="Paragraph" />%s</w:pPr></w:p>'
     format(para_str, ppr_str)
   end
 

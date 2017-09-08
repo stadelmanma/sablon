@@ -297,7 +297,7 @@ module Sablon
       end
     end
 
-    class TableRow < Table
+    class TableRow < Node
       PROPERTIES = %w[cantSplit hidden jc tblCellSpacing tblHeader
                       trHeight tblPrEx].freeze
 
@@ -313,9 +313,18 @@ module Sablon
       def to_docx
         "<w:tr>#{@properties.to_docx}#{@children.to_docx}</w:tr>"
       end
+
+      def accept(visitor)
+        super
+        @children.accept(visitor)
+      end
+
+      def inspect
+        "<#{self.class.node_name}{#{@properties.inspect}}: #{@children.inspect}>"
+      end
     end
 
-    class TableCell < Table
+    class TableCell < Node
       PROPERTIES = %w[gridSpan hideMark noWrap shd tcBorders tcFitText
                       tcMar tcW vAlign vMerge].freeze
       WORD_ML_TAG = 'w:tc'.freeze
@@ -323,13 +332,26 @@ module Sablon
       def initialize(env, node, properties)
         properties = self.class.process_properties(properties)
         @properties = NodeProperties.table_cell(properties)
-        #
-        trans_props = transferred_properties
-        @children = Paragraph.new(env, node, trans_props)
+        # this works in the simple case but fails if the user wants to
+        # nest other block level content in the table cell. According the
+        # spec a table cell can hold any other block level content such as
+        # tables, paragraphs and lists. Ideally, I'd wrap any plain text
+        # a paragraph and then handle block level elements through the
+        # regular AST conversion process.
+        @children = Paragraph.new(env, node, transferred_properties)
       end
 
       def to_docx
         "<w:tc>#{@properties.to_docx}#{@children.to_docx}</w:tc>"
+      end
+
+      def accept(visitor)
+        super
+        @children.accept(visitor)
+      end
+
+      def inspect
+        "<#{self.class.node_name}{#{@properties.inspect}}: #{@children.inspect}>"
       end
     end
 
@@ -390,7 +412,9 @@ module Sablon
       end
 
       # moves any list tags that are a child of a list item tag up one level
-      # so they become a sibling instead of a child
+      # so they become a sibling instead of a child. This is done beacuse
+      # otherise paragraphs nested inside paragraphs in the final output
+      # and that makes the document invalid.
       def process_child_nodes(node)
         node.xpath("./li/#{@list_tag}").each do |list|
           # transfer attributes from parent now because the list tag will
@@ -471,7 +495,7 @@ module Sablon
       end
 
       def inspect
-        "<Footnote: #{@children.inspect}>"
+        "<Footnote{}: #{@children.inspect}>"
       end
     end
 
@@ -523,6 +547,10 @@ module Sablon
         #
         bookmark = Bookmark.new(env, node, properties)
         @children.nodes.insert(0, bookmark)
+      end
+
+      def inspect
+        "<Caption{#{@properties.inspect}}: #{@children.inspect}>"
       end
     end
 

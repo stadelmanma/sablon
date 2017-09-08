@@ -10,10 +10,7 @@ class HTMLConverterASTTest < Sablon::TestCase
     @footnotes.instance_variable_set(:@counter, 1)
     #
     @converter = Sablon::HTMLConverter.new
-    @converter.instance_variable_set(:@env, Sablon::Environment.new(nil))
-    @converter.instance_variable_set(:@bookmarks, @bookmarks)
-    @converter.instance_variable_set(:@numbering, env.numbering)
-    @converter.instance_variable_set(:@footnotes, @footnotes)
+    @converter.instance_variable_set(:@env, env)
   end
 
   def test_div
@@ -85,13 +82,13 @@ class HTMLConverterASTTest < Sablon::TestCase
   def test_ul
     input = '<ul><li>Lorem</li><li>ipsum</li></ul>'
     ast = @converter.processed_ast(input)
-    assert_equal "<Root: [<Paragraph{pStyle=ListBullet;numPr=[{\"ilvl\"=>0}, {\"numId\"=>1001}]}: [<Run{}: Lorem>]>, <Paragraph{pStyle=ListBullet;numPr=[{\"ilvl\"=>0}, {\"numId\"=>1001}]}: [<Run{}: ipsum>]>]>", ast.inspect
+    assert_equal "<Root: [<List: [<Paragraph{pStyle=ListBullet;numPr=[{:ilvl=>\"0\"}, {:numId=>\"1001\"}]}: [<Run{}: Lorem>]>, <Paragraph{pStyle=ListBullet;numPr=[{:ilvl=>\"0\"}, {:numId=>\"1001\"}]}: [<Run{}: ipsum>]>]>]>", ast.inspect
   end
 
   def test_ol
     input = '<ol><li>Lorem</li><li>ipsum</li></ol>'
     ast = @converter.processed_ast(input)
-    assert_equal "<Root: [<Paragraph{pStyle=ListNumber;numPr=[{\"ilvl\"=>0}, {\"numId\"=>1001}]}: [<Run{}: Lorem>]>, <Paragraph{pStyle=ListNumber;numPr=[{\"ilvl\"=>0}, {\"numId\"=>1001}]}: [<Run{}: ipsum>]>]>", ast.inspect
+    assert_equal "<Root: [<List: [<Paragraph{pStyle=ListNumber;numPr=[{:ilvl=>\"0\"}, {:numId=>\"1001\"}]}: [<Run{}: Lorem>]>, <Paragraph{pStyle=ListNumber;numPr=[{:ilvl=>\"0\"}, {:numId=>\"1001\"}]}: [<Run{}: ipsum>]>]>]>", ast.inspect
   end
 
   def test_num_id
@@ -153,7 +150,7 @@ class HTMLConverterASTTest < Sablon::TestCase
     input = '<caption type="Equation" name="test-eqn">Lorem</caption>'
     ast = @converter.processed_ast(input)
     #
-    assert_equal "<Root: [<Caption{pStyle=Caption}: [[<BookmarkStart{id=1;name=test-eqn}>, <Run{}: Equation>, [<Fldchar{}: begin>, <InstrText{}: SEQ Equation \\# \" # \">, <Fldchar{}: separate>, <Run{}:  # >, <Fldchar{}: end>], <BookmarkEnd{id=1;name=}>], <Run{}: Lorem>]>]>", ast.inspect
+    assert_equal "<Root: [<Caption{pStyle=Caption}: [[<BookmarkStart{id=1;name=test-eqn}>, <Run{}: Equation>, [<Fldchar{noProof}: begin>, <InstrText{noProof}: SEQ Equation \\# \" #\">, <Fldchar{noProof}: separate>, <Run{noProof}:  #>, <Fldchar{noProof}: end>], <BookmarkEnd{id=1;name=}>], <Run{}: Lorem>]>]>", ast.inspect
     assert_equal @bookmarks.instance_variable_get(:@counter), 1
     assert_equal @bookmarks.instance_variable_get(:@names), ['test-eqn']
   end
