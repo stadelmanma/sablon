@@ -126,8 +126,7 @@ class HTMLConverterASTTest < Sablon::TestCase
     #
     assert_equal 1, @footnotes.new_footnotes.length
     assert_equal "2", @footnotes.new_footnotes[0].ref_id
-    assert_equal "<Footnote{}: <Paragraph{pStyle=FootnoteText}: [<footnoteRef>, <Run{}: Lorem Ipsum>]>>", @footnotes.new_footnotes[0].inspect
-    assert_equal "<Root: []>", ast.inspect
+    assert_equal "<Root: [<Footnote{}: <Paragraph{pStyle=FootnoteText}: [<footnoteRef>, <Run{}: Lorem Ipsum>]>>]>", ast.inspect
   end
 
   def test_insertion_field
