@@ -62,6 +62,22 @@ module Sablon
       def transferred_properties
         @properties.transferred_properties
       end
+
+      # Simplifies usage at call sites by only requiring them to supply
+      # the tag name to use
+      def to_docx(tag)
+        attr_str = ''
+        if @attributes
+          attr_str = ' ' + @attributes.map { |k, v| %(#{k}="#{v}") }.join(' ')
+        end
+        prop_str = @properties.to_docx if @properties
+        #
+        if @children
+          "<#{tag}#{attr_str}>#{prop_str}#{@children.to_docx}</#{tag}>"
+        else
+          "<#{tag}#{attr_str}>#{prop_str}</#{tag}>"
+        end
+      end
     end
 
     class NodeProperties
@@ -214,7 +230,7 @@ module Sablon
       end
 
       def to_docx
-        "<w:p>#{@properties.to_docx}#{@children.to_docx}</w:p>"
+        super('w:p')
       end
 
       def accept(visitor)
@@ -232,27 +248,25 @@ module Sablon
       PROPERTIES = %w[b i caps color dstrike emboss imprint highlight noProof
                       outline rStyle shadow shd smallCaps strike sz u vanish
                       vertAlign].freeze
-      attr_reader :string
+
+      Text = Struct.new(:content) do
+        def to_docx
+          "<w:t xml:space=\"preserve\">#{content.tr("\u00A0", ' ')}</w:t>"
+        end
+      end
 
       def initialize(_env, node, properties)
         properties = self.class.process_properties(properties)
         @properties = NodeProperties.run(properties)
-        @string = node.text
+        @children = Text.new(node.text)
       end
 
       def to_docx
-        "<w:r>#{@properties.to_docx}#{text}</w:r>"
+        super('w:r')
       end
 
       def inspect
-        "<Run{#{@properties.inspect}}: #{string}>"
-      end
-
-      private
-
-      def text
-        content = @string.tr("\u00A0", ' ')
-        "<w:t xml:space=\"preserve\">#{content}</w:t>"
+        "<Run{#{@properties.inspect}}: #{@children.content}>"
       end
     end
 
@@ -278,7 +292,7 @@ module Sablon
       end
 
       def to_docx
-        "<w:tbl>#{@properties.to_docx}#{@children.to_docx}</w:tbl>"
+        super('w:tbl')
       end
 
       def accept(visitor)
@@ -305,7 +319,7 @@ module Sablon
       end
 
       def to_docx
-        "<w:tr>#{@properties.to_docx}#{@children.to_docx}</w:tr>"
+        super('w:tr')
       end
 
       def accept(visitor)
@@ -336,7 +350,7 @@ module Sablon
       end
 
       def to_docx
-        "<w:tc>#{@properties.to_docx}#{@children.to_docx}</w:tc>"
+        super('w:tc')
       end
 
       def accept(visitor)
@@ -365,10 +379,6 @@ module Sablon
 
         # Move any list tags that are a child of a list item up one level
         process_child_nodes(node)
-
-        # strip text nodes from the list level element, this is typically
-        # extra whitespace from indenting the markup
-        node.search('./text()').remove
 
         # convert children from HTML to AST nodes
         super(ASTBuilder.html_to_ast(env, node.children, properties))
@@ -476,8 +486,7 @@ module Sablon
 
       def to_docx(in_footnotes_xml = false)
         if in_footnotes_xml
-          attr_str = @attributes.map { |k, v| %(#{k}="#{v}") }.join(' ')
-          "<w:footnote #{attr_str}>#{@children.to_docx}</w:footnote>"
+          super('w:footnote')
         else
           ''
         end
@@ -522,10 +531,6 @@ module Sablon
 
       def inspect
         "<FootnoteReference{#{@properties.inspect}}: #{@children.inspect}>"
-      end
-
-      def to_docx
-        "<w:r>#{@properties.to_docx}#{@children.to_docx}</w:r>"
       end
     end
 
@@ -613,16 +618,12 @@ module Sablon
       end
 
       def initialize(properties, type)
-        @type = CharType.new(type)
+        @children = CharType.new(type)
         @properties = NodeProperties.run(properties.merge(noProof: nil))
       end
 
       def inspect
-        "<Fldchar{#{@properties.inspect}}: #{@type.inspect}>"
-      end
-
-      def to_docx
-        "<w:r>#{@properties.to_docx}#{@type.to_docx}</w:r>"
+        "<Fldchar{#{@properties.inspect}}: #{@children.inspect}>"
       end
     end
 
@@ -643,15 +644,11 @@ module Sablon
 
       def initialize(properties, content)
         @properties = NodeProperties.run(properties)
-        @instr = Instructions.new(content)
+        @children = Instructions.new(content)
       end
 
       def inspect
-        "<InstrText{#{@properties.inspect}}: #{@instr.inspect}>"
-      end
-
-      def to_docx
-        "<w:r>#{@properties.to_docx}#{@instr.to_docx}</w:r>"
+        "<InstrText{#{@properties.inspect}}: #{@children.inspect}>"
       end
     end
 
