@@ -56,6 +56,7 @@ module Sablon
         '#document-fragment' => { type: :block, ast_class: :root, allowed_children: :_block },
 
         # block level tags
+<<<<<<< HEAD
         div: { type: :block, ast_class: :paragraph, properties: { pStyle: 'Normal' } },
         p: { type: :block, ast_class: :paragraph, properties: { pStyle: 'Paragraph' } },
         table: { type: :block, ast_class: :table, allowed_children: :tr },
@@ -70,6 +71,16 @@ module Sablon
         h6: { type: :block, ast_class: :paragraph, properties: { pStyle: 'Heading6' } },
         caption: { type: :block, ast_class: :caption, properties: { pStyle: 'Caption' } },
         footnote: { type: :block, ast_class: :footnote, properties: { pStyle: 'FootnoteText' } },
+=======
+        div: { type: :block, ast_class: :paragraph, properties: { pStyle: 'Normal' }, allowed_children: :_inline },
+        p: { type: :block, ast_class: :paragraph, properties: { pStyle: 'Paragraph' }, allowed_children: :_inline },
+        h1: { type: :block, ast_class: :paragraph, properties: { pStyle: 'Heading1' }, allowed_children: :_inline },
+        h2: { type: :block, ast_class: :paragraph, properties: { pStyle: 'Heading2' }, allowed_children: :_inline },
+        h3: { type: :block, ast_class: :paragraph, properties: { pStyle: 'Heading3' }, allowed_children: :_inline },
+        h4: { type: :block, ast_class: :paragraph, properties: { pStyle: 'Heading4' }, allowed_children: :_inline },
+        h5: { type: :block, ast_class: :paragraph, properties: { pStyle: 'Heading5' }, allowed_children: :_inline },
+        h6: { type: :block, ast_class: :paragraph, properties: { pStyle: 'Heading6' }, allowed_children: :_inline },
+>>>>>>> improve-html-parsing
         ol: { type: :block, ast_class: :list, properties: { pStyle: 'ListNumber' }, allowed_children: %i[ol li] },
         ul: { type: :block, ast_class: :list, properties: { pStyle: 'ListBullet' }, allowed_children: %i[ul li] },
         li: { type: :block, ast_class: :list_paragraph },

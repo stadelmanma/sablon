@@ -54,6 +54,10 @@ module Sablon
         end
       end
 
+      def initialize(_env, _node, _properties)
+        @attributes ||= {}
+      end
+
       def accept(visitor)
         visitor.visit(self)
       end
@@ -64,22 +68,17 @@ module Sablon
       end
 
       # Simplifies usage at call sites by only requiring them to supply
-      # the tag name to use
-      def to_docx(tag)
-        attr_str = ''
-        if @attributes
-          attr_str = ' ' + @attributes.map { |k, v| %(#{k}="#{v}") }.join(' ')
-        end
+      # the tag name to use and any child AST nodes to render
+      def to_docx(tag, children = nil)
+        attr_str = @attributes.map { |k, v| %(#{k}="#{v}") }.join(' ')
         prop_str = @properties.to_docx if @properties
+        children_str = children.to_docx if children
         #
-        if @children
-          "<#{tag}#{attr_str}>#{prop_str}#{@children.to_docx}</#{tag}>"
-        else
-          "<#{tag}#{attr_str}>#{prop_str}</#{tag}>"
-        end
+        "<#{tag}#{attr_str}>#{prop_str}#{children_str}</#{tag}>"
       end
     end
 
+    # Manages the properties for an AST node
     class NodeProperties
       attr_reader :transferred_properties
       attr_reader :force_transfer
@@ -172,6 +171,8 @@ module Sablon
       end
     end
 
+    # A container for an array of AST nodes with convenience methods to
+    # work with the internal array as if it were a regular node
     class Collection < Node
       attr_reader :nodes
       def initialize(nodes)
@@ -194,6 +195,8 @@ module Sablon
       end
     end
 
+    # Stores all of the AST nodes from the current fragment of HTML being
+    # parsed
     class Root < Collection
       def initialize(env, node)
         # strip text nodes from the root level element, these are typically
@@ -215,12 +218,15 @@ module Sablon
       end
     end
 
+    # An AST node representing the top level content container for a word
+    # document. These cannot be nested within other paragraph elements
     class Paragraph < Node
       PROPERTIES = %w[framePr ind jc keepLines keepNext numPr
                       outlineLvl pBdr pStyle rPr sectPr shd spacing
                       tabs textAlignment].freeze
 
       def initialize(env, node, properties)
+        super
         properties = self.class.process_properties(properties)
         @properties = NodeProperties.paragraph(properties)
         #
@@ -230,7 +236,7 @@ module Sablon
       end
 
       def to_docx
-        super('w:p')
+        super('w:p', @children)
       end
 
       def accept(visitor)
@@ -256,13 +262,14 @@ module Sablon
       end
 
       def initialize(_env, node, properties)
+        super
         properties = self.class.process_properties(properties)
         @properties = NodeProperties.run(properties)
         @children = Text.new(node.text)
       end
 
       def to_docx
-        super('w:r')
+        super('w:r', @children)
       end
 
       def inspect
@@ -277,6 +284,7 @@ module Sablon
       FORCE_TRANSFER = %w[shd].freeze
 
       def initialize(env, node, properties)
+        super
         # strip text nodes from the root level element, these are typically
         # extra whitespace from indenting the markup
         node.search('./text()').remove
@@ -292,7 +300,7 @@ module Sablon
       end
 
       def to_docx
-        super('w:tbl')
+        super('w:tbl', @children)
       end
 
       def accept(visitor)
@@ -310,6 +318,7 @@ module Sablon
                       trHeight tblPrEx].freeze
 
       def initialize(env, node, properties)
+        super
         properties = self.class.process_properties(properties)
         @properties = NodeProperties.table_row(properties)
         #
@@ -319,7 +328,7 @@ module Sablon
       end
 
       def to_docx
-        super('w:tr')
+        super('w:tr', @children)
       end
 
       def accept(visitor)
@@ -338,6 +347,7 @@ module Sablon
       WORD_ML_TAG = 'w:tc'.freeze
 
       def initialize(env, node, properties)
+        super
         properties = self.class.process_properties(properties)
         @properties = NodeProperties.table_cell(properties)
         # this works in the simple case but fails if the user wants to
@@ -350,7 +360,7 @@ module Sablon
       end
 
       def to_docx
-        super('w:tc')
+        super('w:tc', @children)
       end
 
       def accept(visitor)
@@ -429,7 +439,8 @@ module Sablon
       end
     end
 
-    # Sets list item specific attributes registered on the node
+    # Sets list item specific attributes registered on the node to properly
+    # generate a list paragraph
     class ListParagraph < Paragraph
       def initialize(env, node, properties)
         list_props = {
@@ -470,6 +481,7 @@ module Sablon
       end
 
       def initialize(env, node, properties)
+        super
         @placeholder = node['placeholder']
         @children = Paragraph.new(env, node, properties)
         @children.children.nodes.unshift(Reference.new)
@@ -486,7 +498,7 @@ module Sablon
 
       def to_docx(in_footnotes_xml = false)
         if in_footnotes_xml
-          super('w:footnote')
+          super('w:footnote', @children)
         else
           ''
         end
@@ -519,6 +531,7 @@ module Sablon
       end
 
       def initialize(env, node, properties)
+        @attributes = {}
         @properties = NodeProperties.run(properties)
         @placeholder = node['placeholder']
         @children = Reference.new(node['id'])
@@ -618,6 +631,7 @@ module Sablon
       end
 
       def initialize(properties, type)
+        @attributes = {}
         @children = CharType.new(type)
         @properties = NodeProperties.run(properties.merge(noProof: nil))
       end
@@ -643,6 +657,7 @@ module Sablon
       end
 
       def initialize(properties, content)
+        @attributes = {}
         @properties = NodeProperties.run(properties)
         @children = Instructions.new(content)
       end
