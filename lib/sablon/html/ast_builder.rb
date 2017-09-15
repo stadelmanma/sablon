@@ -64,12 +64,8 @@ module Sablon
 
       # If the node doesn't allow inline elements, or text specifically,
       # drop all text nodes. This is largely meant to prevent whitespace
-<<<<<<< HEAD
-      # between tags from rasing an invalid structure error.
-=======
       # between tags from rasing an invalid structure error. Although it
       # will purge the node whether it contains nonblank characters or not.
->>>>>>> improve-html-parsing
       def drop_text?(child)
         text = fetch_tag(:text)
         !child.allowed_child?(text)
