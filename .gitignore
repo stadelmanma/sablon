@@ -11,6 +11,7 @@
 *.o
 *.a
 mkmf.log
+Gemfile.lock
 
 /test/sandbox/*
 !/test/sandbox/.gitkeep
