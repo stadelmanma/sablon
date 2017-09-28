@@ -108,12 +108,6 @@ class HTMLConverterASTTest < Sablon::TestCase
     assert_equal %w[0 1 2 1 0 1 2], get_numpr_prop_from_ast(ast, :ilvl)
   end
 
-  def test_table
-    input = '<table><tr><td>Lorem</td></tr></table>'
-    ast = @converter.processed_ast(input)
-    assert_equal "<Root: [<Table{}: [<TableRow{}: [<TableCell{}: <Paragraph{}: [<Run{}: Lorem>]>>]>]>]>", ast.inspect
-  end
-
   def test_footnoteref
     input = '<p>Lorem<footnoteref id="2"/></p>'
     ast = @converter.processed_ast(input)
@@ -129,13 +123,6 @@ class HTMLConverterASTTest < Sablon::TestCase
     assert_equal "<Root: [<Footnote{}: <Paragraph{pStyle=FootnoteText}: [<footnoteRef>, <Run{}: Lorem Ipsum>]>>]>", ast.inspect
   end
 
-  def test_insertion_field
-    input = '<p><ins placeholder="pg#">PAGE \\* MERGEFORMAT</ins></p>'
-    ast = @converter.processed_ast(input)
-    #
-    assert_equal "<Root: [<Paragraph{pStyle=Paragraph}: [[<Fldchar{noProof}: begin>, <InstrText{noProof}: PAGE \\* MERGEFORMAT>, <Fldchar{noProof}: separate>, <Run{noProof}: pg#>, <Fldchar{noProof}: end>]]>]>", ast.inspect
-  end
-
   def test_bookmark
     input = '<p><bookmark name="test">Lorem</bookmark> Ipsum</p>'
     ast = @converter.processed_ast(input)
@@ -143,15 +130,6 @@ class HTMLConverterASTTest < Sablon::TestCase
     assert_equal "<Root: [<Paragraph{pStyle=Paragraph}: [[<BookmarkStart{id=1;name=test}>, <Run{}: Lorem>, <BookmarkEnd{id=1;name=}>], <Run{}:  Ipsum>]>]>", ast.inspect
     assert_equal @bookmarks.instance_variable_get(:@counter), 1
     assert_equal @bookmarks.instance_variable_get(:@names), ['test']
-  end
-
-  def test_caption
-    input = '<caption type="Equation" name="test-eqn">Lorem</caption>'
-    ast = @converter.processed_ast(input)
-    #
-    assert_equal "<Root: [<Caption{pStyle=Caption}: [[<BookmarkStart{id=1;name=test-eqn}>, <Run{}: Equation>, [<Fldchar{noProof}: begin>, <InstrText{noProof}: SEQ Equation \\# \" #\">, <Fldchar{noProof}: separate>, <Run{noProof}:  #>, <Fldchar{noProof}: end>], <BookmarkEnd{id=1;name=}>], <Run{}: Lorem>]>]>", ast.inspect
-    assert_equal @bookmarks.instance_variable_get(:@counter), 1
-    assert_equal @bookmarks.instance_variable_get(:@names), ['test-eqn']
   end
 
   private

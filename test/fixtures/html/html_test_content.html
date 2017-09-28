@@ -163,48 +163,6 @@
   <li>Item 3</li>
 </ul>
 
-<h2>Tables</h2>
-
-<table style="border: 1px dotted #00DD33; width: 3000">
-  <tr>
-    <th>TH Cell 1</th>
-    <th>TH Cell 2</th>
-  </tr>
-  <tr>
-    <td>Cell 1</td>
-    <td>Cell 2</td>
-  </tr>
-  <tr>
-    <td><i>Cell 3</i></td>
-    <td><b>Cell 4</b></td>
-  </tr>
-</table>
-
-<p><br/><br/><br/></p>
-
-<table style="font-size: 16; border: 1px;">
-  <tr style="color: #88AADF">
-    <td style="colspan: 2;">Cell 1</td>
-  </tr>
-  <tr>
-    <td style="border: 1px wave #45FF65;"><i>Cell 3</i></td>
-    <td style="vertical-align: bottom"><b style="font-size: 8;">Cell 4</b></td>
-  </tr>
-  <tr style="background-color: #334477">
-    <td style="text-decoration: smallCaps"><i>Cell 3</i></td>
-    <td><s>Cell 4</s></td>
-  </tr>
-</table>
-
-<p><br/><br/><br/></p>
-
-<table style="font-size: 16; border: 1px;">
-  <tr><td style="rowspan: start"></td><td>Cell 1</td></tr>
-  <tr><td style="rowspan: continue"></td><td>Cell 2</td></tr>
-  <tr><td style="rowspan: end"></td><td>Cell 3</td></tr>
-  <tr><td style="rowspan: start"></td><td>Cell 4</td></tr>
-</table>
-
 <h2>Footnotes</h2>
 <p>
   Referencing the pre-existing footnote<footnoteref id="1"/>
@@ -221,23 +179,3 @@
 <footnote placeholder="test-2">
   Footnote from HTML #2
 </footnote>
-
-<h2>Text Insertion Fields</h2>
-<p>
-  <b>To see results update all fields in word doc ctrl+A, F9</b>
-  <br>
-  Current TS:  <ins>DATE \@ "yyyy-dd-MM hh:mm:ss"</ins>
-  <br>
-  Page Number:  <ins>PAGE \* ROMAN</ins>
-  <br>
-  Colored page number: <ins placeholder="pg#" style="color: #FF00FF">PAGE \* ARABIC</ins>
-</p>
-
-<h2>Captions and Bookmarks</h2>
-<p>
-  <bookmark name="test-1">Bookmarked content #1</bookmark>
-  <br>
-  Please see <ins placeholder="?">REF test-1 \h</ins> for more information.
-  Additionally, you may be intersted in <ins placeholder="?">REF test-fig \h</ins>
-</p>
-<caption type="Figure" name="test-fig">. My Caption content, woo!</caption>

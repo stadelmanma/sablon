@@ -364,19 +364,6 @@ class HTMLConverterTest < Sablon::TestCase
     assert_equal [Sablon::Numbering::Definition.new(1001, 'ListBullet')], @numbering.definitions
   end
 
-  def test_basic_html_table_conversion
-    input = <<-HTML
-      <table>
-        <tr><th>TH 1</th><th>TH 2</th></tr>
-        <tr><td>Cell 1</td><td>Cell 2</td></tr>
-        <tr><td>Cell 3</td><td>Cell 4</td></tr>
-      </table>
-    HTML
-    expected_output = snippet('basic_table')
-    #
-    assert_equal normalize_wordml(expected_output), process(input)
-  end
-
   def test_footnoteref_conversion
     input = '<p>Lorem<footnoteref id="1"></p>'
     expected_output = <<-DOCX.strip
@@ -446,39 +433,6 @@ class HTMLConverterTest < Sablon::TestCase
     assert_equal normalize_wordml(expected_output), process(input)
   end
 
-  def test_insertion_field_conversion
-    input = '<p><ins placeholder="{date}">DATE \\@ "yyyy-dd-MM hh:mm:ss"</ins></p>'
-    expected_output = <<-DOCX.strip
-      <w:p>
-        <w:pPr>
-          <w:pStyle w:val="Paragraph" />
-        </w:pPr>
-        <w:r>
-          <w:rPr><w:noProof /></w:rPr>
-          <w:fldChar w:fldCharType="begin"/>
-        </w:r>
-        <w:r>
-          <w:rPr><w:noProof /></w:rPr>
-          <w:instrText xml:space="preserve"> DATE \\@ "yyyy-dd-MM hh:mm:ss" </w:instrText>
-        </w:r>
-        <w:r>
-          <w:rPr><w:noProof /></w:rPr>
-          <w:fldChar w:fldCharType="separate"/>
-        </w:r>
-        <w:r>
-          <w:rPr><w:noProof /></w:rPr>
-          <w:t xml:space="preserve">{date}</w:t>
-        </w:r>
-        <w:r>
-          <w:rPr><w:noProof /></w:rPr>
-          <w:fldChar w:fldCharType="end"/>
-        </w:r>
-      </w:p>
-    DOCX
-    #
-    assert_equal normalize_wordml(expected_output), process(input)
-  end
-
   def test_bookmark_conversion
     input = '<p><bookmark name="test">Lorem</bookmark> Ipsum</p>'
     expected_output = <<-DOCX.strip
@@ -506,57 +460,6 @@ class HTMLConverterTest < Sablon::TestCase
       process(input)
     end
     assert_equal "Bookmark name already in use: test", e.message
-  end
-
-  def test_caption_conversion
-    input = '<caption type="table" name="tab-data">Lorem Ipsum</caption>'
-    expected_output = <<-DOCX.strip
-      <w:p>
-        <w:pPr>
-          <w:pStyle w:val="Caption" />
-        </w:pPr>
-        <w:bookmarkStart w:id="1" w:name="tab-data"/>
-        <w:r>
-          <w:t xml:space="preserve">Table</w:t>
-        </w:r>
-        <w:r>
-          <w:rPr>
-            <w:noProof />
-          </w:rPr>
-          <w:fldChar w:fldCharType="begin"/>
-        </w:r>
-        <w:r>
-          <w:rPr>
-            <w:noProof />
-          </w:rPr>
-          <w:instrText xml:space="preserve"> SEQ Table \\# " #" </w:instrText>
-        </w:r>
-        <w:r>
-          <w:rPr>
-            <w:noProof />
-          </w:rPr>
-          <w:fldChar w:fldCharType="separate"/>
-        </w:r>
-        <w:r>
-          <w:rPr>
-            <w:noProof />
-          </w:rPr>
-          <w:t xml:space="preserve"> #</w:t>
-        </w:r>
-        <w:r>
-          <w:rPr>
-            <w:noProof />
-          </w:rPr>
-          <w:fldChar w:fldCharType="end"/>
-        </w:r>
-        <w:bookmarkEnd w:id="1"/>
-        <w:r>
-          <w:t xml:space="preserve">Lorem Ipsum</w:t>
-        </w:r>
-      </w:p>
-    DOCX
-    #
-    assert_equal normalize_wordml(expected_output), process(input)
   end
 
   private
@@ -782,185 +685,6 @@ class HTMLConverterStyleTest < Sablon::TestCase
     assert_equal normalize_wordml(expected_output), process(input)
   end
 
-  def test_table_with_borders
-    input = '<table style="border: 1px"><tr><td>Cell 1</td></tr></table>'
-    tblpr = <<-DOCX.strip
-      <w:tblBorders>
-        <w:top w:sz="2" w:val="single" w:color="000000" />
-        <w:start w:sz="2" w:val="single" w:color="000000" />
-        <w:bottom w:sz="2" w:val="single" w:color="000000" />
-        <w:end w:sz="2" w:val="single" w:color="000000" />
-        <w:insideH w:sz="2" w:val="single" w:color="000000" />
-        <w:insideV w:sz="2" w:val="single" w:color="000000" />
-      </w:tblBorders>
-    DOCX
-    expected_output = table_with_style(tblPr: tblpr)
-    assert_equal normalize_wordml(expected_output), process(input)
-  end
-
-  def test_table_with_margins
-    # single value test
-    input = '<table style="margin: 1px"><tr><td>Cell 1</td></tr></table>'
-    tblpr = <<-DOCX.strip
-      <w:tblCellMar>
-        <w:top w:w="2" w:type="dxa" />
-        <w:end w:w="2" w:type="dxa" />
-        <w:bottom w:w="2" w:type="dxa" />
-        <w:start w:w="2" w:type="dxa" />
-      </w:tblCellMar>
-    DOCX
-    expected_output = table_with_style(tblPr: tblpr)
-    assert_equal normalize_wordml(expected_output), process(input)
-    # double value test
-    input = '<table style="margin: 1px 2px"><tr><td>Cell 1</td></tr></table>'
-    tblpr = <<-DOCX.strip
-      <w:tblCellMar>
-        <w:top w:w="2" w:type="dxa" />
-        <w:end w:w="4" w:type="dxa" />
-        <w:bottom w:w="2" w:type="dxa" />
-        <w:start w:w="4" w:type="dxa" />
-      </w:tblCellMar>
-    DOCX
-    expected_output = table_with_style(tblPr: tblpr)
-    assert_equal normalize_wordml(expected_output), process(input)
-    # triple value test
-    input = '<table style="margin: 1px 2px 3px"><tr><td>Cell 1</td></tr></table>'
-    tblpr = <<-DOCX.strip
-      <w:tblCellMar>
-        <w:top w:w="2" w:type="dxa" />
-        <w:end w:w="4" w:type="dxa" />
-        <w:bottom w:w="6" w:type="dxa" />
-        <w:start w:w="4" w:type="dxa" />
-      </w:tblCellMar>
-    DOCX
-    expected_output = table_with_style(tblPr: tblpr)
-    assert_equal normalize_wordml(expected_output), process(input)
-    # four values test
-    input = '<table style="margin: 1px 2px 3px 4px"><tr><td>Cell 1</td></tr></table>'
-    tblpr = <<-DOCX.strip
-      <w:tblCellMar>
-        <w:top w:w="2" w:type="dxa" />
-        <w:end w:w="4" w:type="dxa" />
-        <w:bottom w:w="6" w:type="dxa" />
-        <w:start w:w="8" w:type="dxa" />
-      </w:tblCellMar>
-    DOCX
-    expected_output = table_with_style(tblPr: tblpr)
-    assert_equal normalize_wordml(expected_output), process(input)
-  end
-
-  def test_table_with_cellspacing
-    input = '<table style="cellspacing: 10"><tr><td>Cell 1</td></tr></table>'
-    expected_output = table_with_style(tblPr: '<w:tblCellSpacing w:w="20" w:type="dxa" />')
-    assert_equal normalize_wordml(expected_output), process(input)
-  end
-
-  def test_table_with_text_align
-    input = '<table style="text-align: center"><tr><td>Cell 1</td></tr></table>'
-    expected_output = table_with_style(tblPr: '<w:jc w:val="center" />')
-    assert_equal normalize_wordml(expected_output), process(input)
-  end
-
-  def test_table_with_width
-    input = '<table style="width: 1000"><tr><td>Cell 1</td></tr></table>'
-    expected_output = table_with_style(tblPr: '<w:tblW w:w="2000" w:type="dxa" />')
-    assert_equal normalize_wordml(expected_output), process(input)
-  end
-
-  def test_table_with_row_text_align
-    input = '<table><tr style="text-align: center"><td>Cell 1</td></tr></table>'
-    expected_output = table_with_style(trPr: '<w:jc w:val="center" />')
-    assert_equal normalize_wordml(expected_output), process(input)
-  end
-
-  def test_table_with_cell_borders
-    input = '<table><tr><td style="border: 1px">Cell 1</td></tr></table>'
-    tcpr = <<-DOCX.strip
-      <w:tcBorders>
-        <w:top w:sz="2" w:val="single" w:color="000000" />
-        <w:start w:sz="2" w:val="single" w:color="000000" />
-        <w:bottom w:sz="2" w:val="single" w:color="000000" />
-        <w:end w:sz="2" w:val="single" w:color="000000" />
-        <w:insideH w:sz="2" w:val="single" w:color="000000" />
-        <w:insideV w:sz="2" w:val="single" w:color="000000" />
-      </w:tcBorders>
-    DOCX
-    expected_output = table_with_style(tcPr: tcpr)
-    assert_equal normalize_wordml(expected_output), process(input)
-    # test that the proeprty will be passed onto cells from rows
-    input = '<table><tr style="border: 1px"><td>Cell 1</td></tr></table>'
-    tcpr = <<-DOCX.strip
-      <w:tcBorders>
-        <w:top w:sz="2" w:val="single" w:color="000000" />
-        <w:start w:sz="2" w:val="single" w:color="000000" />
-        <w:bottom w:sz="2" w:val="single" w:color="000000" />
-        <w:end w:sz="2" w:val="single" w:color="000000" />
-        <w:insideH w:sz="2" w:val="single" w:color="000000" />
-        <w:insideV w:sz="2" w:val="single" w:color="000000" />
-      </w:tcBorders>
-    DOCX
-    expected_output = table_with_style(tcPr: tcpr)
-    assert_equal normalize_wordml(expected_output), process(input)
-  end
-
-  def test_table_with_cell_colspan
-    input = '<table><tr><td style="colspan: 2">Cell 1</td></tr></table>'
-    expected_output = table_with_style(tcPr: '<w:gridSpan w:val="2" />')
-    assert_equal normalize_wordml(expected_output), process(input)
-  end
-
-  def test_table_with_cell_margin
-    input = '<table><tr><td style="margin: 1px">Cell 1</td></tr></table>'
-    tcpr = <<-DOCX.strip
-      <w:tcMar>
-        <w:top w:w="2" w:type="dxa" />
-        <w:end w:w="2" w:type="dxa" />
-        <w:bottom w:w="2" w:type="dxa" />
-        <w:start w:w="2" w:type="dxa" />
-      </w:tcMar>
-    DOCX
-    expected_output = table_with_style(tcPr: tcpr)
-    assert_equal normalize_wordml(expected_output), process(input)
-  end
-
-  def test_table_with_cell_rowspan
-    # test start
-    input = '<table><tr><td style="rowspan: start">Cell 1</td></tr></table>'
-    expected_output = table_with_style(tcPr: '<w:vMerge w:val="restart" />')
-    assert_equal normalize_wordml(expected_output), process(input)
-    # test continue
-    input = '<table><tr><td style="rowspan: continue">Cell 1</td></tr></table>'
-    expected_output = table_with_style(tcPr: '<w:vMerge w:val="continue" />')
-    assert_equal normalize_wordml(expected_output), process(input)
-    # test end
-    input = '<table><tr><td style="rowspan: end">Cell 1</td></tr></table>'
-    expected_output = table_with_style(tcPr: '<w:vMerge />')
-    assert_equal normalize_wordml(expected_output), process(input)
-  end
-
-  def test_table_with_cell_vertical_align
-    input = '<table><tr><td style="vertical-align: top">Cell 1</td></tr></table>'
-    expected_output = table_with_style(tcPr: '<w:vAlign w:val="top" />')
-    assert_equal normalize_wordml(expected_output), process(input)
-  end
-
-  def test_table_with_cell_white_space
-    # test nowrap
-    input = '<table><tr><td style="white-space: nowrap">Cell 1</td></tr></table>'
-    expected_output = table_with_style(tcPr: '<w:noWrap />')
-    assert_equal normalize_wordml(expected_output), process(input)
-    # test fit
-    input = '<table><tr><td style="white-space: fit">Cell 1</td></tr></table>'
-    expected_output = table_with_style(tcPr: '<w:tcFitText w:val="true" />')
-    assert_equal normalize_wordml(expected_output), process(input)
-  end
-
-  def test_table_with_cell_width
-    input = '<table><tr><td style="width: 1000">Cell 1</td></tr></table>'
-    expected_output = table_with_style(tcPr: '<w:tcW w:w="2000" w:type="dxa" />')
-    assert_equal normalize_wordml(expected_output), process(input)
-  end
-
   private
 
   def process(input)
@@ -987,35 +711,6 @@ class HTMLConverterStyleTest < Sablon::TestCase
       </w:p>
     DOCX
     format(para_str, rpr_str)
-  end
-
-  def table_with_style(properties)
-    properties = { tblPr: nil, trPr: nil, tcPr: nil,
-                   pPr: nil, rPr: nil }.merge(properties)
-    properties = properties.map do |key, value|
-      "<w:#{key}>#{value}</w:#{key}>" if value
-    end
-    #
-    table_str = <<-DOCX.strip
-      <w:tbl>
-        %s
-        <w:tr>
-          %s
-          <w:tc>
-            %s
-            <w:p>
-              %s
-              <w:r>
-                %s
-                <w:t xml:space="preserve">Cell 1</w:t>
-              </w:r>
-            </w:p>
-          </w:tc>
-        </w:tr>
-      </w:tbl>
-    DOCX
-    #
-    format(table_str, *properties)
   end
 
   def normalize_wordml(wordml)
