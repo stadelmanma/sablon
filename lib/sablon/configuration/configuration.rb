@@ -58,17 +58,12 @@ module Sablon
         # block level tags
         div: { type: :block, ast_class: :paragraph, properties: { pStyle: 'Normal' }, allowed_children: :_inline },
         p: { type: :block, ast_class: :paragraph, properties: { pStyle: 'Paragraph' }, allowed_children: :_inline },
-        table: { type: :block, ast_class: :table, allowed_children: :tr },
-        tr: { type: :block, ast_class: :table_row, allowed_children: %i[th td] },
-        th: { type: :block, ast_class: :table_cell, properties: { b: nil, jc: 'center'}, allowed_children: %i[_block _inline] },
-        td: { type: :block, ast_class: :table_cell, allowed_children: %i[_block _inline] },
         h1: { type: :block, ast_class: :paragraph, properties: { pStyle: 'Heading1' }, allowed_children: :_inline },
         h2: { type: :block, ast_class: :paragraph, properties: { pStyle: 'Heading2' }, allowed_children: :_inline },
         h3: { type: :block, ast_class: :paragraph, properties: { pStyle: 'Heading3' }, allowed_children: :_inline },
         h4: { type: :block, ast_class: :paragraph, properties: { pStyle: 'Heading4' }, allowed_children: :_inline },
         h5: { type: :block, ast_class: :paragraph, properties: { pStyle: 'Heading5' }, allowed_children: :_inline },
         h6: { type: :block, ast_class: :paragraph, properties: { pStyle: 'Heading6' }, allowed_children: :_inline },
-        caption: { type: :block, ast_class: :caption, properties: { pStyle: 'Caption' }, allowed_children: :_inline },
         footnote: { type: :block, ast_class: :footnote, properties: { pStyle: 'FootnoteText' }, allowed_children: :_inline },
         ol: { type: :block, ast_class: :list, properties: { pStyle: 'ListNumber' }, allowed_children: %i[ol li] },
         ul: { type: :block, ast_class: :list, properties: { pStyle: 'ListBullet' }, allowed_children: %i[ul li] },
@@ -87,10 +82,9 @@ module Sablon
 
         # inline content tags
         bookmark: { type: :inline, ast_class: :bookmark },
-        text: { type: :inline, ast_class: :run, properties: {}, allowed_children: [] },
-        br: { type: :inline, ast_class: :newline, properties: {}, allowed_children: [] },
-        ins: { type: :inline, ast_class: :complex_field, properties: { noProof: nil }, allowed_children: %i[text] },
         footnoteref: { type: :inline, ast_class: :footnote_reference, properties: { rStyle: 'FootnoteReference' }, allowed_children: [] },
+        text: { type: :inline, ast_class: :run, properties: {}, allowed_children: [] },
+        br: { type: :inline, ast_class: :newline, properties: {}, allowed_children: [] }
       }
       # add all tags to the config object
       tags.each do |tag_name, settings|
@@ -166,63 +160,6 @@ module Sablon
           'vertical-align' => lambda { |v|
             return 'vertAlign', 'subscript' if v =~ /sub/
             return 'vertAlign', 'superscript' if v =~ /super/
-          }
-        },
-        table: {
-          'border' => lambda { |v|
-            props = @defined_style_conversions[:node][:_border].call(v)
-            #
-            return 'tblBorders', [
-              { top: props }, { start: props }, { bottom: props },
-              { end: props }, { insideH: props }, { insideV: props }
-            ]
-          },
-          'margin' => lambda { |v|
-            vals = v.split.map { |s| @defined_style_conversions[:node][:_sz].call(s) }
-            #
-            props = [vals[0], vals[0], vals[0], vals[0]] if vals.length == 1
-            props = [vals[0], vals[1], vals[0], vals[1]] if vals.length == 2
-            props = [vals[0], vals[1], vals[2], vals[1]] if vals.length == 3
-            props = [vals[0], vals[1], vals[2], vals[3]] if vals.length > 3
-            return 'tblCellMar', [
-              { top: { w: props[0], type: 'dxa' } },
-              { end: { w: props[1], type: 'dxa' } },
-              { bottom: { w: props[2], type: 'dxa' } },
-              { start: { w: props[3], type: 'dxa' } }
-            ]
-          },
-          'cellspacing' => lambda { |v|
-            v = @defined_style_conversions[:node][:_sz].call(v)
-            return 'tblCellSpacing', { w: v, type: 'dxa' }
-          },
-          'width' => lambda { |v|
-            v = @defined_style_conversions[:node][:_sz].call(v)
-            return 'tblW', { w: v, type: 'dxa' }
-          }
-        },
-        table_cell: {
-          'border' => lambda { |v|
-            value = @defined_style_conversions[:table]['border'].call(v)[1]
-            return 'tcBorders', value
-          },
-          'colspan' => ->(v) { return 'gridSpan', v },
-          'margin' => lambda { |v|
-            value = @defined_style_conversions[:table]['margin'].call(v)[1]
-            return 'tcMar', value
-          },
-          'rowspan' => lambda { |v|
-            return 'vMerge', 'restart' if v == 'start'
-            return 'vMerge', v if v == 'continue'
-            return 'vMerge', nil if v == 'end'
-          },
-          'vertical-align' => ->(v) { return 'vAlign', v },
-          'white-space' => lambda { |v|
-            return 'noWrap', nil if v == 'nowrap'
-            return 'tcFitText', 'true' if v == 'fit'
-          },
-          'width' => lambda { |v|
-            value = @defined_style_conversions[:table]['width'].call(v)[1]
-            return 'tcW', value
           }
         }
       }

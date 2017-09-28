@@ -95,18 +95,6 @@ module Sablon
         _factory_init('w:rPr', properties, Run)
       end
 
-      def self.table(properties)
-        _factory_init('w:tblPr', properties, Table)
-      end
-
-      def self.table_row(properties)
-        _factory_init('w:trPr', properties, TableRow)
-      end
-
-      def self.table_cell(properties)
-        _factory_init('w:tcPr', properties, TableCell)
-      end
-
       def self._factory_init(tagname, properties, klass)
         new(tagname, properties, klass::PROPERTIES, klass::FORCE_TRANSFER)
       end
@@ -253,130 +241,6 @@ module Sablon
       end
     end
 
-    # Create a run of text in the document
-    class Run < Node
-      PROPERTIES = %w[b i caps color dstrike emboss imprint highlight noProof
-                      outline rStyle shadow shd smallCaps strike sz u vanish
-                      vertAlign].freeze
-
-      Text = Struct.new(:content) do
-        def to_docx
-          "<w:t xml:space=\"preserve\">#{content.tr("\u00A0", ' ')}</w:t>"
-        end
-      end
-
-      def initialize(_env, node, properties)
-        super
-        properties = self.class.process_properties(properties)
-        @properties = NodeProperties.run(properties)
-        @children = Text.new(node.text)
-      end
-
-      def to_docx
-        super('w:r', @children)
-      end
-
-      def inspect
-        "<Run{#{@properties.inspect}}: #{@children.content}>"
-      end
-    end
-
-    class Table < Node
-      PROPERTIES = %w[jc shd tblBorders tblCaption tblCellMar tblCellSpacing
-                      tblInd tblLayout tblLook tblOverlap tblpPr tblStyle
-                      tblStyleColBandSize tblStyleRowBandSize tblW].freeze
-      FORCE_TRANSFER = %w[shd].freeze
-
-      def initialize(env, node, properties)
-        super
-        # strip text nodes from the root level element, these are typically
-        # extra whitespace from indenting the markup
-        node.search('./text()').remove
-
-        # Process properties
-        properties = self.class.process_properties(properties)
-        @properties = NodeProperties.table(properties)
-
-        # convert child nodes and pass on properties not retained by the parent
-        trans_props = transferred_properties
-        @children = ASTBuilder.html_to_ast(env, node.children, trans_props)
-        @children = Collection.new(@children)
-      end
-
-      def to_docx
-        super('w:tbl', @children)
-      end
-
-      def accept(visitor)
-        super
-        @children.accept(visitor)
-      end
-
-      def inspect
-        "<#{self.class.node_name}{#{@properties.inspect}}: #{@children.inspect}>"
-      end
-    end
-
-    class TableRow < Node
-      PROPERTIES = %w[cantSplit hidden jc tblCellSpacing tblHeader
-                      trHeight tblPrEx].freeze
-
-      def initialize(env, node, properties)
-        super
-        properties = self.class.process_properties(properties)
-        @properties = NodeProperties.table_row(properties)
-        #
-        trans_props = transferred_properties
-        @children = ASTBuilder.html_to_ast(env, node.children, trans_props)
-        @children = Collection.new(@children)
-      end
-
-      def to_docx
-        super('w:tr', @children)
-      end
-
-      def accept(visitor)
-        super
-        @children.accept(visitor)
-      end
-
-      def inspect
-        "<#{self.class.node_name}{#{@properties.inspect}}: #{@children.inspect}>"
-      end
-    end
-
-    class TableCell < Node
-      PROPERTIES = %w[gridSpan hideMark noWrap shd tcBorders tcFitText
-                      tcMar tcW vAlign vMerge].freeze
-      WORD_ML_TAG = 'w:tc'.freeze
-
-      def initialize(env, node, properties)
-        super
-        properties = self.class.process_properties(properties)
-        @properties = NodeProperties.table_cell(properties)
-        # this works in the simple case but fails if the user wants to
-        # nest other block level content in the table cell. According the
-        # spec a table cell can hold any other block level content such as
-        # tables, paragraphs and lists. Ideally, I'd wrap any plain text
-        # a paragraph and then handle block level elements through the
-        # regular AST conversion process.
-        @children = Paragraph.new(env, node, transferred_properties)
-      end
-
-      def to_docx
-        super('w:tc', @children)
-      end
-
-      def accept(visitor)
-        super
-        @children.accept(visitor)
-      end
-
-      def inspect
-        "<#{self.class.node_name}{#{@properties.inspect}}: #{@children.inspect}>"
-      end
-    end
-
     # Manages the child nodes of a list type tag
     class List < Collection
       def initialize(env, node, properties)
@@ -459,6 +323,47 @@ module Sablon
 
       def transferred_properties
         super
+      end
+    end
+
+    # Create a run of text in the document
+    class Run < Node
+      PROPERTIES = %w[b i caps color dstrike emboss imprint highlight noProof
+                      outline rStyle shadow shd smallCaps strike sz u vanish
+                      vertAlign].freeze
+
+      Text = Struct.new(:content) do
+        def to_docx
+          "<w:t xml:space=\"preserve\">#{content.tr("\u00A0", ' ')}</w:t>"
+        end
+      end
+
+      def initialize(_env, node, properties)
+        super
+        properties = self.class.process_properties(properties)
+        @properties = NodeProperties.run(properties)
+        @children = Text.new(node.text)
+      end
+
+      def to_docx
+        super('w:r', @children)
+      end
+
+      def inspect
+        "<Run{#{@properties.inspect}}: #{@children.content}>"
+      end
+    end
+
+    # Creates a blank line in the word document
+    class Newline < Node
+      def initialize(*); end
+
+      def to_docx
+        "<w:r><w:br/></w:r>"
+      end
+
+      def inspect
+        "<Newline>"
       end
     end
 
@@ -551,25 +456,6 @@ module Sablon
       end
     end
 
-    class Caption < Paragraph
-      def initialize(env, node, properties)
-        super
-        type = node['type'].capitalize
-        # remove all children to create a proper bookmark that only encompasses
-        # "Type (number)"
-        node.children.remove
-        node.add_child type
-        node.add_child %(<ins placeholder=" #">SEQ #{type} \\# " #"</ins>)
-        #
-        bookmark = Bookmark.new(env, node, properties)
-        @children.nodes.insert(0, bookmark)
-      end
-
-      def inspect
-        "<Caption{#{@properties.inspect}}: #{@children.inspect}>"
-      end
-    end
-
     class Bookmark < Collection
       attr_reader :name
       BookmarkTag = Struct.new(:type, :id, :name) do
@@ -602,85 +488,6 @@ module Sablon
       def id=(value)
         @children[0] = BookmarkTag.new('start', value, @name)
         @children[-1] = BookmarkTag.new('end', value, nil)
-      end
-    end
-
-    class ComplexField < Collection
-      def initialize(env, node, properties)
-        pseudo_node = Struct.new(:text).new(node['placeholder'].to_s)
-        @children = [
-          FldChar.new(properties, 'begin'),
-          InstrText.new(properties, node.text),
-          FldChar.new(properties, 'separate'),
-          Run.new(env, pseudo_node, properties),
-          FldChar.new(properties, 'end')
-        ]
-        super(@children)
-      end
-    end
-
-    # isn't meant to be created directly from a HTML node
-    class FldChar < Run
-      #
-      CharType = Struct.new(:type) do
-        def accept(*_); end
-
-        def inspect
-          type
-        end
-
-        def to_docx
-          "<w:fldChar w:fldCharType=\"#{type}\"/>"
-        end
-      end
-
-      def initialize(properties, type)
-        @attributes = {}
-        @children = CharType.new(type)
-        @properties = NodeProperties.run(properties.merge(noProof: nil))
-      end
-
-      def inspect
-        "<Fldchar{#{@properties.inspect}}: #{@children.inspect}>"
-      end
-    end
-
-    # isn't meant to be created directly from an HTML node
-    class InstrText < Run
-      #
-      Instructions = Struct.new(:content) do
-        def accept(*_); end
-
-        def inspect
-          content
-        end
-
-        def to_docx
-          "<w:instrText xml:space=\"preserve\"> #{content} </w:instrText>"
-        end
-      end
-
-      def initialize(properties, content)
-        @attributes = {}
-        @properties = NodeProperties.run(properties)
-        @children = Instructions.new(content)
-      end
-
-      def inspect
-        "<InstrText{#{@properties.inspect}}: #{@children.inspect}>"
-      end
-    end
-
-    # Creates a blank line in the word document
-    class Newline < Node
-      def initialize(*); end
-
-      def to_docx
-        "<w:r><w:br/></w:r>"
-      end
-
-      def inspect
-        "<Newline>"
       end
     end
   end
