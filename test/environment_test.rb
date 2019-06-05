@@ -6,7 +6,7 @@ class EnvironmentTest < Sablon::TestCase
     context = Sablon::Context.transform_hash(a: 1, b: { c: 2, "d" => 3 })
     env = Sablon::Environment.new(nil, a: 1, b: { c: 2, "d" => 3 })
     #
-    assert_nil env.template
+    assert_nil env.document
     assert_equal context, env.context
   end
 
@@ -21,8 +21,8 @@ class EnvironmentTest < Sablon::TestCase
     # check that the old context was not modified
     assert_equal({"a" => 1, "b" => { "c" => 2, "d" => 3 }}, env.context)
 
-    # check that numbering and template are the same references
-    assert env.template.equal?(env2.template), "#{env.template} != #{env2.template}"
+    # check that numbering and document are the same references
+    assert env.document.equal?(env2.document), "#{env.document} != #{env2.document}"
 
     # check that a new context reference was created
     assert !env.context.equal?(env2.context), "#{env.context} == #{env2.context}"

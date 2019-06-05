@@ -708,7 +708,7 @@ class ProcessorDocumentTest < Sablon::TestCase
   private
 
   def process(document, context)
-    env = Sablon::Environment.new(MockTemplate.new, context)
+    env = Sablon::Environment.new(MockDomModel.new, context)
     env.document.current_entry = 'word/document.xml'
     @processor.process(wrap(document), env).to_xml
   end

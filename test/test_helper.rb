@@ -70,15 +70,6 @@ class Sablon::TestCase < MiniTest::Test
     super
   end
 
-  class MockTemplate
-    attr_reader :document
-
-    def initialize
-      @path = nil
-      @document = MockDomModel.new
-    end
-  end
-
   # catch all for method stubs that are needed during testing
   class MockDomModel
     attr_accessor :current_entry

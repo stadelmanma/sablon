@@ -4,14 +4,14 @@ require "test_helper"
 class HTMLConverterASTTest < Sablon::TestCase
   def setup
     super
-    @template = MockTemplate.new
-    @env = Sablon::Environment.new(@template)
+    @dom = MockDomModel.new
+    @env = Sablon::Environment.new(@dom)
     @converter = Sablon::HTMLConverter.new
     @converter.instance_variable_set(:@env, @env)
   end
 
   def teardown
-    @template.document.reset
+    @dom.reset
   end
 
   def test_div

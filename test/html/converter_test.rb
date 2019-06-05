@@ -4,13 +4,13 @@ require "test_helper"
 class HTMLConverterTest < Sablon::TestCase
   def setup
     super
-    @template = MockTemplate.new
-    @env = Sablon::Environment.new(@template)
+    @dom = MockDomModel.new
+    @env = Sablon::Environment.new(@dom)
     @converter = Sablon::HTMLConverter.new
   end
 
   def teardown
-    @template.document.reset
+    @dom.reset
   end
 
   def test_convert_text_inside_div
@@ -41,7 +41,7 @@ class HTMLConverterTest < Sablon::TestCase
       <w:p>
         <w:pPr><w:pStyle w:val="Normal" /></w:pPr>
         <w:r><w:t xml:space="preserve">Lorem ipsum dolor sit amet; search it at </w:t></w:r>
-        <w:hyperlink r:id=\"rId#{@template.document.current_rid + 1}\">
+        <w:hyperlink r:id=\"rId#{@dom.current_rid + 1}\">
           <w:r>
             <w:rPr>
               <w:rStyle w:val=\"Hyperlink\" />
@@ -60,7 +60,7 @@ class HTMLConverterTest < Sablon::TestCase
       <w:p>
         <w:pPr><w:pStyle w:val="Paragraph" /></w:pPr>
         <w:r><w:t xml:space="preserve">Lorem ipsum dolor sit amet; search it at </w:t></w:r>
-        <w:hyperlink r:id=\"rId#{@template.document.current_rid + 1}\">
+        <w:hyperlink r:id=\"rId#{@dom.current_rid + 1}\">
             <w:r>
               <w:rPr>
                 <w:rStyle w:val=\"Hyperlink\" />
@@ -397,7 +397,7 @@ class HTMLConverterTest < Sablon::TestCase
         <w:pPr>
         <w:pStyle w:val="Paragraph" />
         </w:pPr>
-        <w:hyperlink r:id="rId#{@template.document.current_rid + 1}">
+        <w:hyperlink r:id="rId#{@dom.current_rid + 1}">
           <w:r>
           <w:rPr>
             <w:rStyle w:val="Hyperlink" />

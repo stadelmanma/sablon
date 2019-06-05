@@ -4,13 +4,13 @@ require "test_helper"
 class HTMLConverterStyleTest < Sablon::TestCase
   def setup
     super
-    @template = MockTemplate.new
-    @env = Sablon::Environment.new(@template)
+    @dom = MockDomModel.new
+    @env = Sablon::Environment.new(@dom)
     @converter = Sablon::HTMLConverter.new
   end
 
   def teardown
-    @template.document.reset
+    @dom.reset
   end
 
   # testing direct CSS style -> WordML conversion for paragraphs
@@ -81,7 +81,7 @@ class HTMLConverterStyleTest < Sablon::TestCase
   # test that styles defined on the <a> tag are passed down to runs
   def test_hyperlink_with_font_style
     input = '<p><a href="http://www.google.com" style="font-style: italic">Google</a></p>'
-    expected_output = hyperlink_with_rpr('<w:i />', @template.document.current_rid + 1)
+    expected_output = hyperlink_with_rpr('<w:i />', @dom.current_rid + 1)
     assert_equal normalize_wordml(expected_output), process(input)
   end
 
