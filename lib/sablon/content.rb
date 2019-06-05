@@ -254,9 +254,32 @@ module Sablon
       end
     end
 
+    # Handles reading a docx file used like a Ruby on Rails partial
+    class Partial < Struct.new(:document)
+
+      def self.id; :partial end
+      def self.wraps?(value) false end
+
+      def inspect
+        "#<Partial #{name}>"
+      end
+
+      def initialize(source)
+        # Read from a file on disk or an IO-likeo object stored in memory
+        if source.respond_to?(:read)
+          super Zip::File.open_buffer(source) { |z| Sablon::DOM::Model.new(z) }
+        else
+          super Zip::File.open(source) { |z| Sablon::DOM::Model.new(z) }
+        end
+      end
+
+      def append_to(paragraph, display_node, env) end
+    end
+
     register Sablon::Content::String
     register Sablon::Content::WordML
     register Sablon::Content::HTML
     register Sablon::Content::Image
+    register Sablon::Content::Partial
   end
 end
