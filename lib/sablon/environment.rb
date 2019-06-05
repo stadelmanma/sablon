@@ -21,6 +21,7 @@ module Sablon
     def initialize(document, context = {})
       @document = document
       @context = Context.transform_hash(context)
+      @section_properties = {}
     end
   end
 end

@@ -53,8 +53,8 @@ module Sablon
 
     def render(context, properties = {})
       # initialize environment
-      @document = Sablon::DOM::Model.new(Zip::File.open(@path))
-      env = Sablon::Environment.new(self, context)
+      @document = Zip::File.open(@path) { |zp| Sablon::DOM::Model.new(zp) }
+      env = Sablon::Environment.new(@document, context)
       env.section_properties = properties
       #
       # process files

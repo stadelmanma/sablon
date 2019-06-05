@@ -184,15 +184,15 @@ module Sablon
         "#<Image #{name}:#{@rid_by_file}>"
       end
 
-      def initialize(source, attributes = {})
+      def initialize(src, attributes = {})
         attributes = Hash[attributes.map { |k, v| [k.to_s, v] }]
-        # If the source object is readable, use it as such otherwise open
+        # If the src object is readable, use it as such otherwise open
         # and read the content
-        if source.respond_to?(:read)
-          name, img_data = process_readable(source, attributes)
+        if src.respond_to?(:read)
+          name, img_data = process_readable(src, attributes)
         else
-          name = File.basename(source)
-          img_data = IO.binread(source)
+          name = File.basename(src)
+          img_data = IO.binread(src)
         end
         #
         super name, img_data
@@ -219,22 +219,22 @@ module Sablon
       private
 
       # Reads the data and attempts to find a filename from either the
-      # attributes hash or a #filename method on the source object itself.
+      # attributes hash or a #filename method on the src object itself.
       # A filename is required inorder for MS Word to know the content type.
-      def process_readable(source, attributes)
+      def process_readable(src, attributes)
         if attributes['filename']
           name = attributes['filename']
-        elsif source.respond_to?(:filename)
-          name = source.filename
+        elsif src.respond_to?(:filename)
+          name = src.filename
         else
           begin
-            name = File.basename(source)
+            name = File.basename(src)
           rescue TypeError
-            raise ArgumentError, "Error: Could not determine filename from source, try: `Sablon.content(readable_obj, filename: '...')`"
+            raise ArgumentError, "Error: Could not determine filename from src, try: `Sablon.content(:image, readable_obj, filename: '...')`"
           end
         end
         #
-        [File.basename(name), source.read]
+        [File.basename(name), src.read]
       end
 
       # Convert centimeters or inches to Word specific emu format
@@ -255,50 +255,58 @@ module Sablon
     end
 
     # Handles reading a docx file used like a Ruby on Rails partial
-    class Partial < Struct.new(:document)
+    class Partial
       include Sablon::Content
 
       def self.id; :partial end
       def self.wraps?(value) false end
 
       def inspect
-        "#<Partial #{name}>"
+        "#<Partial file=#{@filename}>"
       end
 
-      def initialize(source)
-        # Read from a file on disk or an IO-likeo object stored in memory
-        if source.respond_to?(:read)
-          super Zip::File.open_buffer(source) { |z| Sablon::DOM::Model.new(z) }
-        else
-          super Zip::File.open(source) { |z| Sablon::DOM::Model.new(z) }
-        end
+      def initialize(src)
+        # Read from a file on disk or an IO-like object stored in memory
+        @filename = src
+        @data = (src.respond_to?(:read) ? src.read : IO.binread(src)).freeze
       end
 
       def append_to(paragraph, display_node, env)
         # TODO:
-        #  * Process the document.xml content as if it were a template
-        #    due to the files I need to require I could run into a circular
-        #    dependency problem. Ideally I will do this in initialize.
-        #  * Extract body of document.xml and store it as a WordML content
-        #    type
         #  * Use DOM to pull in other things used by document.xml such as
         #    images, lists, footnotes, endnotes, links, bookmarks, etc.
         #    Styles will not be ported across.
         #  * Update the existing document.xml with adjusted unique identifiers
-        #  * Inject document.xml content (excluding the body tags) into the
-        #    word doc.
         #  * Some complications may arise if the patial is used in the same
         #    document more than once and it has the above ported features.
-
+        document = process_partial(env)
 
         # Use WordML to handle the content injection, this is going to be
         # to be a block level replacement 99% of the time since there is
         # usually a paragraph or table at this level and a majority of the
         # content defined as inline isn't allowed to be a child of the
         # body tag.
-        xml = document.zip_contents['word/document.xml']
-        body = xml.xpath('//w:body')
+        body = document.zip_contents['word/document.xml'].xpath('//w:body')
         WordML.new(body.children).append_to(paragraph, display_node, env)
+      end
+
+      private
+
+      def process_partial(env)
+        # Process the partial using the current context, we only care about
+        # the document.xml entry so we don't process anything else
+        document = nil
+        Zip::File.open_buffer(StringIO.new(@data)) do |z|
+          document = Sablon::DOM::Model.new(z)
+        end
+
+        xml = document.zip_contents['word/document.xml']
+        local_env = Sablon::Environment.new(document, env.context)
+
+        processors = Template.get_processors('word/document.xml')
+        processors.each { |processor| processor.process(xml, local_env) }
+        #
+        document
       end
     end
 
