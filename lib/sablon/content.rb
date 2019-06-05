@@ -256,6 +256,7 @@ module Sablon
 
     # Handles reading a docx file used like a Ruby on Rails partial
     class Partial < Struct.new(:document)
+      include Sablon::Content
 
       def self.id; :partial end
       def self.wraps?(value) false end
@@ -273,7 +274,32 @@ module Sablon
         end
       end
 
-      def append_to(paragraph, display_node, env) end
+      def append_to(paragraph, display_node, env)
+        # TODO:
+        #  * Process the document.xml content as if it were a template
+        #    due to the files I need to require I could run into a circular
+        #    dependency problem. Ideally I will do this in initialize.
+        #  * Extract body of document.xml and store it as a WordML content
+        #    type
+        #  * Use DOM to pull in other things used by document.xml such as
+        #    images, lists, footnotes, endnotes, links, bookmarks, etc.
+        #    Styles will not be ported across.
+        #  * Update the existing document.xml with adjusted unique identifiers
+        #  * Inject document.xml content (excluding the body tags) into the
+        #    word doc.
+        #  * Some complications may arise if the patial is used in the same
+        #    document more than once and it has the above ported features.
+
+
+        # Use WordML to handle the content injection, this is going to be
+        # to be a block level replacement 99% of the time since there is
+        # usually a paragraph or table at this level and a majority of the
+        # content defined as inline isn't allowed to be a child of the
+        # body tag.
+        xml = document.zip_contents['word/document.xml']
+        body = xml.xpath('//w:body')
+        WordML.new(body.children).append_to(paragraph, display_node, env)
+      end
     end
 
     register Sablon::Content::String
