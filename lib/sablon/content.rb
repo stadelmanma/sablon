@@ -280,7 +280,7 @@ module Sablon
         #  * Some complications may arise if the patial is used in the same
         #    document more than once and it has the above ported features.
         local_dom = process_partial(env)
-        update_document_references(env.document, local_dom)
+        update_document_relationships(env.document, local_dom)
 
         # Use WordML to handle the content injection, this is going to be
         # to be a block level replacement 99% of the time since there is
@@ -311,7 +311,7 @@ module Sablon
         document
       end
 
-      def update_document_references(env_dom, partial_dom)
+      def update_document_relationships(env_dom, partial_dom)
         xml = partial_dom.zip_contents['word/document.xml']
         xml_str = xml.to_s
 
@@ -330,27 +330,34 @@ module Sablon
         # current DOM, we don't know what attribute contains the rId so we
         # simply loop oiver it until we find something matching the pattern
         # and then add it to the current document, changing it's value. If
-        # the value isn't in the relationship file then we assum it's a
+        # the value isn't in the relationship file then we assume it's a
         # false positive.
-        nodes.each do |n|
-          possible_rids = n.attributes.values.select { |a| a.value =~ /rId\d/ }
-          possible_rids.each do |a|
-            next unless (rel = partial_dom.find_relationship_by('Id', a.value))
-            attrs = Hash[rel.attributes.map { |k, v| [k, v.value] }]
-            # copy any media added, ensuring we don't overwrite a file
-            if rel['Target'] =~ /media/
-              name = File.basename(rel['Target'])
-              names = env_dom.zip_contents.keys.map { |fn| File.basename(fn) }
-              pattern = "^(\\d+)-#{name}"
-              val = names.collect { |fn| fn.match(pattern).to_a[1].to_i }.max
-              #
-              attrs['Target'] = "media/#{val + 1}-#{name}"
-              data = partial_dom.zip_contents["word/#{rel['Target']}"]
-              env_dom.zip_contents["word/#{attrs['Target']}"] = data
-            end
-            new_rid = env_dom.add_relationship(attrs)
-            a.value = new_rid
+        nodes.each { |n| duplicate_relationship(env_dom, partial_dom, n) }
+      end
+
+      def duplicate_relationship(env_dom, partial_dom, node)
+        possible_rids = node.attributes.values.select { |a| a.value =~ /rId\d/ }
+        possible_rids.each do |a|
+          next unless (rel = partial_dom.find_relationship_by('Id', a.value))
+          attrs = Hash[rel.attributes.map { |k, v| [k, v.value] }]
+          # copy any media added, ensuring we don't overwrite a file
+          if rel['Target'] =~ /media/
+            attrs['Target'] = copy_media(env_dom, partial_dom, rel['Target'])
           end
+          a.value = env_dom.add_relationship(attrs)
+        end
+      end
+
+      def copy_media(env_dom, partial_dom, target)
+        name = File.basename(target)
+        names = env_dom.zip_contents.keys.map { |fn| File.basename(fn) }
+        pattern = "^(\\d+)-#{name}"
+        val = names.collect { |fn| fn.match(pattern).to_a[1].to_i }.max
+        #
+        new_name = "media/#{val + 1}-#{name}"
+        env_dom.zip_contents["word/#{new_name}"] = partial_dom.zip_contents["word/#{target}"]
+        new_name
+      end
         end
       end
     end
