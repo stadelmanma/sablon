@@ -281,6 +281,7 @@ module Sablon
         #    document more than once and it has the above ported features.
         local_dom = process_partial(env)
         update_document_relationships(env.document, local_dom)
+        update_document_content_types(env.document, local_dom)
 
         # Use WordML to handle the content injection, this is going to be
         # to be a block level replacement 99% of the time since there is
@@ -358,6 +359,13 @@ module Sablon
         env_dom.zip_contents["word/#{new_name}"] = partial_dom.zip_contents["word/#{target}"]
         new_name
       end
+
+      def update_document_content_types(env_dom, partial_dom)
+        # update any Extension definitions that are missing from the
+        # parent document
+        xml = partial_dom.zip_contents['[Content_Types].xml']
+        xml.css('Default[Extension]').each do |ctype|
+          env_dom.add_content_type(ctype['Extension'], ctype['ContentType'])
         end
       end
     end
