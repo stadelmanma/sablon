@@ -279,14 +279,15 @@ module Sablon
         #  * Update the existing document.xml with adjusted unique identifiers
         #  * Some complications may arise if the patial is used in the same
         #    document more than once and it has the above ported features.
-        document = process_partial(env)
+        local_dom = process_partial(env)
+        update_document_references(env.document, local_dom)
 
         # Use WordML to handle the content injection, this is going to be
         # to be a block level replacement 99% of the time since there is
         # usually a paragraph or table at this level and a majority of the
         # content defined as inline isn't allowed to be a child of the
         # body tag.
-        body = document.zip_contents['word/document.xml'].xpath('//w:body')
+        body = local_dom.zip_contents['word/document.xml'].xpath('//w:body')
         WordML.new(body.children).append_to(paragraph, display_node, env)
       end
 
@@ -299,14 +300,58 @@ module Sablon
         Zip::File.open_buffer(StringIO.new(@data)) do |z|
           document = Sablon::DOM::Model.new(z)
         end
+        document.current_entry = 'word/document.xml'
 
-        xml = document.zip_contents['word/document.xml']
+        xml = document.zip_contents[document.current_entry]
         local_env = Sablon::Environment.new(document, env.context)
 
-        processors = Template.get_processors('word/document.xml')
+        processors = Template.get_processors(document.current_entry)
         processors.each { |processor| processor.process(xml, local_env) }
         #
         document
+      end
+
+      def update_document_references(env_dom, partial_dom)
+        xml = partial_dom.zip_contents['word/document.xml']
+        xml_str = xml.to_s
+
+        # Copy over the relevant relationships, if the rel is in the
+        # media folder we copy over the new media as well. rId values
+        # can appear in multiple elements and places so we use a somewhat
+        # general regex to find what nodes to search for
+        elms = xml_str.scan(/<(\w+):(\w+) .+"rId\d+".*>/).uniq
+        xmlns = elms.flat_map { |n, _| xml_str.scan(/xmlns:(#{n})="(.+?)"/) }
+        xmlns = Hash[xmlns]
+        nodes = elms.flat_map do |n, e|
+          xml.xpath("//#{n}:#{e}", "#{n}": xmlns[n])
+        end
+
+        # now that we have the nodes we need to add the references to the
+        # current DOM, we don't know what attribute contains the rId so we
+        # simply loop oiver it until we find something matching the pattern
+        # and then add it to the current document, changing it's value. If
+        # the value isn't in the relationship file then we assum it's a
+        # false positive.
+        nodes.each do |n|
+          possible_rids = n.attributes.values.select { |a| a.value =~ /rId\d/ }
+          possible_rids.each do |a|
+            next unless (rel = partial_dom.find_relationship_by('Id', a.value))
+            attrs = Hash[rel.attributes.map { |k, v| [k, v.value] }]
+            # copy any media added, ensuring we don't overwrite a file
+            if rel['Target'] =~ /media/
+              name = File.basename(rel['Target'])
+              names = env_dom.zip_contents.keys.map { |fn| File.basename(fn) }
+              pattern = "^(\\d+)-#{name}"
+              val = names.collect { |fn| fn.match(pattern).to_a[1].to_i }.max
+              #
+              attrs['Target'] = "media/#{val + 1}-#{name}"
+              data = partial_dom.zip_contents["word/#{rel['Target']}"]
+              env_dom.zip_contents["word/#{attrs['Target']}"] = data
+            end
+            new_rid = env_dom.add_relationship(attrs)
+            a.value = new_rid
+          end
+        end
       end
     end
 
