@@ -44,13 +44,13 @@ module Sablon
         definition
       end
 
-      private
-
       # Finds the maximum value of an attribute by converting it to an
       # integer. Non numeric portions of values are ignored.
       def max_attribute_value(selector, attr_name)
         super(@numbering, selector, attr_name)
       end
+
+      private
 
       # Creates a new list definition tag to define a list
       def definition_tag(definition)

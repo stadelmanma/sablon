@@ -274,14 +274,14 @@ module Sablon
       def append_to(paragraph, display_node, env)
         # TODO:
         #  * Use DOM to pull in other things used by document.xml such as
-        #    images, lists, footnotes, endnotes, links, bookmarks, etc.
-        #    Styles will not be ported across.
+        #    lists, footnotes, endnotes, bookmarks, etc.
         #  * Update the existing document.xml with adjusted unique identifiers
         #  * Some complications may arise if the patial is used in the same
         #    document more than once and it has the above ported features.
         local_dom = process_partial(env)
         update_document_relationships(env.document, local_dom)
         update_document_content_types(env.document, local_dom)
+        update_list_definitions(env.document, local_dom)
 
         # Use WordML to handle the content injection, this is going to be
         # to be a block level replacement 99% of the time since there is
@@ -352,8 +352,7 @@ module Sablon
       def copy_media(env_dom, partial_dom, target)
         name = File.basename(target)
         names = env_dom.zip_contents.keys.map { |fn| File.basename(fn) }
-        pattern = "^(\\d+)-#{name}"
-        val = names.collect { |fn| fn.match(pattern).to_a[1].to_i }.max
+        val = names.collect { |n| n.match(/^(\d+)-#{name}/).to_a[1].to_i }.max
         #
         new_name = "media/#{val + 1}-#{name}"
         env_dom.zip_contents["word/#{new_name}"] = partial_dom.zip_contents["word/#{target}"]
@@ -367,6 +366,52 @@ module Sablon
         xml.css('Default[Extension]').each do |ctype|
           env_dom.add_content_type(ctype['Extension'], ctype['ContentType'])
         end
+      end
+
+      def update_list_definitions(env_dom, partial_dom)
+        # determine max numid and max abstract ID present in parent document
+        main_xml = env_dom.zip_contents['word/numbering.xml']
+        numb = env_dom['word/numbering.xml']
+        max_numid = numb.max_attribute_value('//w:num', 'w:numId')
+        max_defid = numb.max_attribute_value('//w:abstractNum',
+                                             'w:abstractNumId')
+
+        # Collect all hte numId elements in the partials document.xml
+        # that will be updated with corrected IDs later on
+        xml = partial_dom.zip_contents['word/document.xml']
+        numid_nodes = xml.xpath('//w:numId')
+
+        # Copy all list definitions in use within the partial into the
+        # parent document
+        xml = partial_dom.zip_contents['word/numbering.xml']
+        num_id_mapping = {}
+        numid_nodes.map { |n| n['w:val'] }.uniq.each do |numid|
+          num_node = xml.at_xpath("//w:num[@w:numId='#{numid}']")
+          id_node = num_node.at_xpath('./w:abstractNumId')
+          def_node = xml.at_xpath(
+            "//w:abstractNum[@w:abstractNumId='#{id_node['w:val']}']"
+          )
+
+          # remove the unique idenifier since I don't want to try and
+          # regenerate a valid value
+          def_node.xpath('./w:nsid').each(&:remove)
+
+          # adjust attribute values and update mapping
+          num_node['w:numId'] = (max_numid += 1)
+          id_node['w:val'] = (max_defid += 1)
+          def_node['w:abstractNumId'] = id_node['w:val']
+          num_id_mapping[numid] = max_numid
+
+          # Copy definitions from partial into parent
+          node = main_xml.xpath('//w:abstractNum').last
+          node.add_next_sibling(def_node)
+          node = main_xml.xpath('//w:num').last
+          node.add_next_sibling(num_node)
+        end
+
+        # update w:numId nodes inside the document.xml for the partial
+        # according to a mapping
+        numid_nodes.each { |n| n['w:val'] = num_id_mapping[n['w:val']] }
       end
     end
 
