@@ -282,6 +282,7 @@ module Sablon
         update_document_relationships(env.document, local_dom)
         update_document_content_types(env.document, local_dom)
         update_list_definitions(env.document, local_dom)
+        update_bookmarks(env.document, local_dom)
 
         # Use WordML to handle the content injection, this is going to be
         # to be a block level replacement 99% of the time since there is
@@ -376,7 +377,7 @@ module Sablon
         max_defid = numb.max_attribute_value('//w:abstractNum',
                                              'w:abstractNumId')
 
-        # Collect all hte numId elements in the partials document.xml
+        # Collect all the numId elements in the partials document.xml
         # that will be updated with corrected IDs later on
         xml = partial_dom.zip_contents['word/document.xml']
         numid_nodes = xml.xpath('//w:numId')
@@ -412,6 +413,46 @@ module Sablon
         # update w:numId nodes inside the document.xml for the partial
         # according to a mapping
         numid_nodes.each { |n| n['w:val'] = num_id_mapping[n['w:val']] }
+      end
+
+      def update_bookmarks(env_dom, partial_dom)
+        # determine the maximum boookmark ID value and get a list of all
+        # names in use
+        xml = env_dom.zip_contents['word/document.xml']
+        doc = env_dom['word/document.xml']
+        max_id = doc.max_attribute_value(xml, '//w:bookmarkStart', 'w:id')
+        used_names = xml.xpath('//w:bookmarkStart').map { |n| n['w:name'] }
+
+        # locate all bookmark start and end tags
+        xml = partial_dom.zip_contents['word/document.xml']
+        st_nodes = xml.xpath('//w:bookmarkStart')
+        en_nodes = xml.xpath('//w:bookmarkEnd')
+
+        # Collect a unique list of names and IDs to update via a mapping
+        ids = st_nodes.map { |n| n['w:id'] }
+        names = st_nodes.map { |n| n['w:name'] }
+        id_mapping = Hash[ids.map { |v| [v, (max_id += 1)] }]
+        name_mapping = Hash[names.map { |v| [v, v] }]
+
+        # check for any names that exist in both documents and adjust
+        # mapping value
+        (names & used_names).each do |name|
+          pat = /^#{name}_(\d+)/
+          val = used_names.collect { |n| n.match(pat).to_a[1].to_i }.max
+          name_mapping[name] = "#{name}_#{val + 1}"
+        end
+
+        # update nodes
+        (st_nodes + en_nodes).each { |n| n['w:id'] = id_mapping[n['w:id']] }
+        st_nodes.each { |n| n['w:name'] = name_mapping[n['w:name']] }
+
+        # update bookmark references, I think these are the only nodes
+        # to use them
+        xml.xpath('//w:instrText').each do |n|
+          next unless (mat = n.text.match(/\s*REF (\w+)/))
+          bk_name = name_mapping[mat[1]]
+          n.content = n.text.sub(/\s*REF (\w+)/, " REF #{bk_name}")
+        end
       end
     end
 
