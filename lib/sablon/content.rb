@@ -272,12 +272,8 @@ module Sablon
       end
 
       def append_to(paragraph, display_node, env)
-        # TODO:
-        #  * Use DOM to pull in other things used by document.xml such as
-        #    lists, footnotes, endnotes, bookmarks, etc.
-        #  * Update the existing document.xml with adjusted unique identifiers
-        #  * Some complications may arise if the patial is used in the same
-        #    document more than once and it has the above ported features.
+        # Create a local DOM for the partial and then update various
+        # aspects the main document to work with the injected content
         local_dom = process_partial(env)
         update_document_relationships(env.document, local_dom)
         update_document_content_types(env.document, local_dom)
