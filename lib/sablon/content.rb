@@ -283,6 +283,8 @@ module Sablon
         update_document_content_types(env.document, local_dom)
         update_list_definitions(env.document, local_dom)
         update_bookmarks(env.document, local_dom)
+        update_footnotes(env.document, local_dom)
+        update_endnotes(env.document, local_dom)
 
         # Use WordML to handle the content injection, this is going to be
         # to be a block level replacement 99% of the time since there is
@@ -447,11 +449,49 @@ module Sablon
         st_nodes.each { |n| n['w:name'] = name_mapping[n['w:name']] }
 
         # update bookmark references, I think these are the only nodes
-        # to use them
+        # to use them, if the reference can't be found in the mapping then
+        # we will leave it alone.
         xml.xpath('//w:instrText').each do |n|
           next unless (mat = n.text.match(/\s*REF (\w+)/))
-          bk_name = name_mapping[mat[1]]
+          next unless (bk_name = name_mapping[mat[1]])
           n.content = n.text.sub(/\s*REF (\w+)/, " REF #{bk_name}")
+        end
+      end
+
+      def update_footnotes(env_dom, partial_dom)
+        update_notes(env_dom, partial_dom, 'footnote')
+      end
+
+      def update_endnotes(env_dom, partial_dom)
+        update_notes(env_dom, partial_dom, 'endnote')
+      end
+
+      def update_notes(env_dom, partial_dom, kind)
+        # determine the maximum footnote ID value
+        xml = env_dom.zip_contents["word/#{kind}s.xml"]
+        entry = env_dom["word/#{kind}s.xml"]
+        if entry.nil?
+          raise ContextError,
+                "Partial contains #{kind}s but main document does not."
+        end
+        max_id = entry.max_attribute_value(xml, "//w:#{kind}", 'w:id')
+
+        # collect all footnote references in use inside the partial
+        xml = partial_dom.zip_contents['word/document.xml']
+        refs = xml.xpath("//w:#{kind}Reference")
+
+        # create an id mapping and then start updating nodes and copying
+        # the footnote definitions
+        main_xml = env_dom.zip_contents["word/#{kind}s.xml"]
+        xml = partial_dom.zip_contents["word/#{kind}s.xml"]
+        id_mapping = Hash[refs.map { |n| [n['w:id'], (max_id += 1)] }]
+        refs.each do |ref|
+          node = xml.at_xpath("//w:#{kind}[@w:id='#{ref['w:id']}']")
+          ref['w:id'] = id_mapping[ref['w:id']]
+          node['w:id'] = id_mapping[node['w:id']]
+          #
+          last_node = main_xml.xpath("//w:#{kind}").last
+          last_node.add_next_sibling(node)
         end
       end
     end
