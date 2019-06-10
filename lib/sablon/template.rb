@@ -34,7 +34,7 @@ module Sablon
     end
 
     def initialize(path)
-      @path = path
+      @path = Pathname.new(path)
     end
 
     # Same as +render_to_string+ but writes the processed template to +output_path+.
@@ -56,6 +56,7 @@ module Sablon
       @document = Zip::File.open(@path) { |zp| Sablon::DOM::Model.new(zp) }
       env = Sablon::Environment.new(@document, context)
       env.section_properties = properties
+      env.template_path = @path
       #
       # process files
       process(env)

@@ -2,6 +2,7 @@ module Sablon
   # Combines the user supplied context and template into a single object
   # to manage data during template processing.
   class Environment
+    attr_accessor :template_path
     attr_reader :document
     attr_reader :context
     attr_reader :section_properties
