@@ -151,6 +151,13 @@ module Sablon
         image.local_rid = image.rid_by_file[env.document.current_entry]
       end
     end
+
+    class Partial < Struct.new(:filename, :field)
+      def evaluate(env)
+        fname = "#{env.template_path.dirname}/#{filename}.docx"
+        field.replace(Sablon.content(:partial, fname), env)
+      end
+    end
   end
 
   module Expression

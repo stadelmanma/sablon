@@ -101,6 +101,18 @@ module Sablon
         end
       end
 
+      # Handles partial document insertion
+      class PartialHandler < FieldHandler
+        def initialize
+          super(/^\+/)
+        end
+
+        def build_statement(_constructor, field, options = {})
+          return unless options[:allow_insertion]
+          Statement::Partial.new(field.expression.gsub(/^\+/, ''), field)
+        end
+      end
+
       # Handles comment blocks in the template
       class CommentHandler < FieldHandler
         def initialize

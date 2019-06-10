@@ -103,6 +103,7 @@ module Sablon
       register_field_handler :each_loop, EachLoopHandler.new
       register_field_handler :conditional, ConditionalHandler.new
       register_field_handler :image, ImageHandler.new
+      register_field_handler :partial, PartialHandler.new
       register_field_handler :comment, CommentHandler.new
     end
   end
