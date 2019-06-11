@@ -287,11 +287,24 @@ module Sablon
         # usually a paragraph or table at this level and a majority of the
         # content defined as inline isn't allowed to be a child of the
         # body tag.
-        body = local_dom.zip_contents['word/document.xml'].xpath('//w:body')
-        WordML.new(body.children).append_to(paragraph, display_node, env)
+        WordML.new(children(local_dom)).append_to(paragraph, display_node, env)
       end
 
       private
+
+      # Array of tags removed from the body XML prior to injection into
+      # the document, the #name method does not include the namespace prefix
+      # so we drop it here.
+      def excluded_tags
+        %w[sectPr]
+      end
+
+      # extract valid child tags from the partial's body XML
+      def children(local_dom)
+        body = local_dom.zip_contents['word/document.xml'].xpath('//w:body')
+        nodes = body.children.reject { |n| excluded_tags.include? n.name }
+        Nokogiri::XML::NodeSet.new(body.document, nodes)
+      end
 
       def process_partial(env)
         # Process the partial using the current context, we only care about
