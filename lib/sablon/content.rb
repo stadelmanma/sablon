@@ -317,6 +317,9 @@ module Sablon
 
         xml = document.zip_contents[document.current_entry]
         local_env = Sablon::Environment.new(document, env.context)
+        # set the partial path as the template path, that way nested
+        # partials can be relative to the current partial's path
+        local_env.template_path = @filename
 
         processors = Template.get_processors(document.current_entry)
         processors.each { |processor| processor.process(xml, local_env) }
