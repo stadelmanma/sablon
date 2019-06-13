@@ -267,7 +267,7 @@ module Sablon
 
       def initialize(src)
         # Read from a file on disk or an IO-like object stored in memory
-        @filename = src
+        @filename = Pathname.new(src)
         @data = (src.respond_to?(:read) ? src.read : IO.binread(src)).freeze
       end
 
