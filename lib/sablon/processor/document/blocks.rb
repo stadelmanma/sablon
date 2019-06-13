@@ -168,7 +168,7 @@ module Sablon
         # parent paragraph of the start node.
         def replace_parent_node(content)
           node = start_node.ancestors('.//w:p').first
-          content.each { |n| node.add_next_sibling n }
+          content.reverse.each { |n| node.add_next_sibling n }
           node.remove
         end
       end
